@@ -5,4 +5,4 @@ The goal is to use all of these computational resources to compute faster.
 
 Join in the effort if you'd like to help out this cause.
 
-So far, it only works on Windows using VisualStudio 2015.
+Works on Windows using VisualStudio 2017 (version 15.6.6, but for some reason CUDA 9.2 does not work with later versions such as 15.7.6).
