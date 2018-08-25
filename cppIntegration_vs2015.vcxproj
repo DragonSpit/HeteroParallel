@@ -129,6 +129,7 @@
     <ClCompile Include="cppIntegration_gold.cpp" />
     <ClCompile Include="CudaRandom.cpp" />
     <ClCompile Include="main.cpp" />
+    <CudaCompile Include="radixSortThrust.cu" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\Intel\tbb2017_20160722oss_win\tbb2017_20160722oss\examples\graph\fgbzip2\bzlib_private.h" />

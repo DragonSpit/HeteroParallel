@@ -78,6 +78,7 @@ extern int clRngExample(void);
 extern int ArrayFireTest(int device);
 extern int ArrayFireIntegerExample(int device);
 extern void generateRandomArrayInChunks(int device, size_t numChunks, size_t chunkSize, unsigned long long seed = 2);
+extern int myMainSort(int argc, char **argv);
 
 
 using namespace concurrency;
@@ -241,7 +242,9 @@ wmain(int argc, char **argv)
 	//benchmarkGraph();
 
 	//mainThread();
-	benchmarkLoadBalancer();	// CPU and Cuda GPU RNG
+	//benchmarkLoadBalancer();	// CPU and Cuda GPU RNG
+	myMainSort(argc, argv);
+
 	//openClHelloWorld();
 	//secondOnenClExample();
 
