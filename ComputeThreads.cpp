@@ -1,5 +1,4 @@
 #include <windows.h>
-#include <stdio.h>
 #include <iostream>
 #include <fstream>
 
@@ -99,7 +98,7 @@ int loadBalancerInit(void)
 		return -3;
 	}
 
-	// Create CudaGpu thread (e.g. for MKL)
+	// Create CudaGpu thread (e.g. for cuRAND)
 	hThread = CreateThread(
 		NULL,         // default security attributes
 		0,            // default stack size
@@ -233,7 +232,7 @@ int runLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, u
 						workCudaGPU.b_CPU = NULL;
 						resultArrayIndex_GPU += NumOfRandomsInWorkQuanta;
 					}
-					//printf("Cuda GPU work item: amountOfWord = %d at GPU memory address %p\n", workCudaGPU.amountOfWork, workCudaGPU.b_GPU);
+					//printf("Cuda GPU work item: amountOfWork = %d at GPU memory address %p\n", workCudaGPU.amountOfWork, workCudaGPU.b_GPU);
 					//printf("Event set for work item for CUDA GPU\n");
 					if (!SetEvent(ghEventWorkForCudaGpu))	// Set one event to the signaled state
 					{

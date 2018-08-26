@@ -242,8 +242,8 @@ wmain(int argc, char **argv)
 	//benchmarkGraph();
 
 	//mainThread();
-	//benchmarkLoadBalancer();	// CPU and Cuda GPU RNG
-	myMainSort(argc, argv);
+	benchmarkLoadBalancer();	// CPU and Cuda GPU RNG
+	//myMainSort(argc, argv);
 
 	//openClHelloWorld();
 	//secondOnenClExample();
