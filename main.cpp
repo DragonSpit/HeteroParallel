@@ -62,7 +62,6 @@
 
 extern int tbbAsyncNodeExample();
 extern int tbbGraphExample();
-extern void runAsyncNode();
 extern int tbb_join_node_example();
 extern void runHeteroRandomGenerator();
 extern void RngHetero(size_t numRandomsToGenerate, size_t workChunkSize, bool copyGPUresultsToSystemMemory);
@@ -262,8 +261,6 @@ wmain(int argc, char **argv)
 	//return 0;
 
 	////tbb_join_node_example();
-
-	////runAsyncNode();
 
 	//return 0;
 

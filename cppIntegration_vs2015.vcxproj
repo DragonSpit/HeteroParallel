@@ -107,16 +107,10 @@
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\Intel\tbb2017_20160722oss_win\tbb2017_20160722oss\examples\graph\fgbzip2\blocksort.cpp" />
-    <ClCompile Include="..\..\Intel\tbb2017_20160722oss_win\tbb2017_20160722oss\examples\graph\fgbzip2\bzlib.cpp" />
-    <ClCompile Include="..\..\Intel\tbb2017_20160722oss_win\tbb2017_20160722oss\examples\graph\fgbzip2\compress.cpp" />
     <ClCompile Include="..\..\Intel\tbb2017_20160722oss_win\tbb2017_20160722oss\examples\graph\fgbzip2\crctable.cpp" />
-    <ClCompile Include="..\..\Intel\tbb2017_20160722oss_win\tbb2017_20160722oss\examples\graph\fgbzip2\decompress.cpp" />
-    <ClCompile Include="..\..\Intel\tbb2017_20160722oss_win\tbb2017_20160722oss\examples\graph\fgbzip2\huffman.cpp" />
     <ClCompile Include="..\..\Intel\tbb2017_20160722oss_win\tbb2017_20160722oss\examples\graph\fgbzip2\randtable.cpp" />
     <ClCompile Include="ArrayFire.cpp" />
     <ClCompile Include="asyncNodeExample.cpp" />
-    <ClCompile Include="asyncNodeFileCompressExample.cpp" />
     <ClCompile Include="asyncNodeGenerate.cpp" />
     <ClCompile Include="clRngExample.cpp" />
     <ClCompile Include="ComputeThreads.cpp" />
@@ -132,7 +126,6 @@
     <CudaCompile Include="radixSortThrust.cu" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\Intel\tbb2017_20160722oss_win\tbb2017_20160722oss\examples\graph\fgbzip2\bzlib_private.h" />
     <ClInclude Include="asyncNodeGenerator.h" />
     <ClInclude Include="CudaSupport.h" />
     <ClInclude Include="utils.h" />
