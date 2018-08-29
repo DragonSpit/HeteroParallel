@@ -16,7 +16,13 @@ struct RandomsGenerated
 	RandomsGenSpec CudaGPU;		// spec for generated randoms in graphics/GPU memory
 };
 
-enum ResultDestination { ResultInEachDevicesMemory, ResultInSystemMemory, ResultInCudaGPUMemory, ResultInOpenCLGPUMemory };
+enum ComputeEngine {
+	CPU = 0, CUDA_GPU, OPENCL_GPU, FPGA
+};
+
+enum ResultDestination {
+	ResultInEachDevicesMemory = 0, ResultInSystemMemory, ResultInCudaGpuMemory, ResultInOpenclGpuMemory, ResultInFpgaMemory
+};
 
 // TODO: In the future, the user could specify 0 for each capacity and we discover it for them, but to start with we'll put the burden on the user
 // TODO: In the future, the user could specify 0 for each work quanta and we discover the optimal value for them.
@@ -52,8 +58,16 @@ __int64 time_call(Function&& f)
 
 struct WorkType
 {
-	int    workerType;		// which worker this is. TODO: Change to enum for readability
-	size_t amountOfWork;
-	char*  b_CPU;			// where to put the result of work in system/CPU memory
-	char*  b_GPU;			// where to put the result of work in graphics/GPU memory
+	ComputeEngine WorkerType;	// what kind of worker this is
+	size_t AmountOfWork;
+	char*  HostPtr;				// host memory pointer
+	char*  DevicePtr;			// device memory pointer
+
+	void SetWorkType(ComputeEngine workerType, size_t amountOfWord, char* hostPtr, char* devicePtr)
+	{
+		workerType = workerType;
+		AmountOfWork = amountOfWord;
+		HostPtr = hostPtr;
+		DevicePtr = devicePtr;
+	}
 };

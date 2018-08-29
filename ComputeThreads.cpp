@@ -123,7 +123,7 @@ int runLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, u
 																	// TODO: Fix the problem with the case of asking the CudaGPU to generate more randoms that can fit into it's memory, but no other computational units are helping to generate more
 																	// TODO: One possible way to do this is to pre-determine the NumOfWorkItems and shrink it in case there is not enough memory between all of the generators
 																	// TODO: Another way is to create a method that takes genSpec as input and outputs all of the needed setup variables with their values for the rest of the code to use
-	size_t NumOfWorkItems = (genSpec.resultDestination == ResultInCudaGPUMemory && !genSpec.CPU.helpOthers) ?
+	size_t NumOfWorkItems = (genSpec.resultDestination == ResultInCudaGpuMemory && !genSpec.CPU.helpOthers) ?
 		__min(genSpec.CudaGPU.maxRandoms, NumOfRandomsToGenerate) / NumOfRandomsInWorkQuanta : NumOfRandomsToGenerate / NumOfRandomsInWorkQuanta;
 	size_t NumOfBytesForRandomArray = NumOfRandomsInWorkQuanta * sizeof(float);	// TODO: Need to change to NumOfRandomsToGenerate, and not be a hack of a single work item's worth of memory
 
@@ -151,14 +151,14 @@ int runLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, u
 		preallocateGPUmemorySize = 0;
 	else if (genSpec.resultDestination == ResultInEachDevicesMemory && !genSpec.CudaGPU.helpOthers)
 		preallocateGPUmemorySize = genSpec.CudaGPU.maxRandoms * sizeof(float);
-	else if (genSpec.resultDestination == ResultInCudaGPUMemory)
+	else if (genSpec.resultDestination == ResultInCudaGpuMemory)
 		preallocateGPUmemorySize = genSpec.CudaGPU.maxRandoms * sizeof(float);
 	else {
 		printf("Error: Unsupported configuration\n");
 		return -1;
 	}
 	printf("Allocating CudaGPU memory of %zd bytes\n", preallocateGPUmemorySize);
-	bool freeCudaMemory = ((genSpec.resultDestination == ResultInEachDevicesMemory && !genSpec.CudaGPU.helpOthers) || (genSpec.resultDestination == ResultInCudaGPUMemory))
+	bool freeCudaMemory = ((genSpec.resultDestination == ResultInEachDevicesMemory && !genSpec.CudaGPU.helpOthers) || (genSpec.resultDestination == ResultInCudaGpuMemory))
 		? false : true;
 	// TODO: This is really hacky! We need a way to set the cudaBuffer memory pointer inside AsyncGenerateNodeActivity class in a much cleaner way, possibly in constructor
 	if (genSpec.generated.CudaGPU.buffer != NULL)
@@ -190,51 +190,52 @@ int runLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, u
 		timer.timeStamp();
 		// Start each worker in the graph, once the graph has been constructructed
 		// TODO: Need to handle less work than enough for each of the worker type (e.g. 1.5xWorkQuanta randoms, 0.2xWorkQuanta randoms, with two available workers)
-		size_t resultArrayIndex = 0;		// TODO: Chage the name to _CPU
+		size_t resultArrayIndex_CPU = 0;
 		size_t resultArrayIndex_GPU = 0;
 		size_t inputWorkIndex = 0;
 		if (NumOfWorkItems > 0) {
 			// TODO: Consider all combinations of where the randoms end up and who is allowed to help generate them. Is there a way to handle them in a general way (flags)?
 			if (genSpec.resultDestination == ResultInSystemMemory || genSpec.resultDestination == ResultInEachDevicesMemory ||
-				(genSpec.resultDestination == ResultInCudaGPUMemory   && genSpec.CPU.helpOthers) ||
-				(genSpec.resultDestination == ResultInOpenCLGPUMemory && genSpec.CPU.helpOthers)) {
+				(genSpec.resultDestination == ResultInCudaGpuMemory   && genSpec.CPU.helpOthers) ||
+				(genSpec.resultDestination == ResultInOpenclGpuMemory && genSpec.CPU.helpOthers)) {
 				//printf("First CPU work item\n");
-				workCPU.workerType = 0;						// CPU   TODO: Create enum {CPU = 0, CUDA_GPU = 1, OpenCL_GPU, FPGA, etc} for all types 
-				workCPU.amountOfWork = NumOfRandomsInWorkQuanta;
-				workCPU.b_CPU = (char *)(&(randomFloatArray[resultArrayIndex]));
+				workCPU.WorkerType = ComputeEngine::CPU;
+				workCPU.AmountOfWork = NumOfRandomsInWorkQuanta;
+				workCPU.HostPtr = (char *)(&(randomFloatArray[resultArrayIndex_CPU]));
 				//printf("Event set for work item for MultiCore CPU\n");
-				if (!SetEvent(ghEventWorkForCpu))	// Set one event to the signaled state
+				if (!SetEvent(ghEventWorkForCpu))	// signal that CPU has a work item to work on
 				{
 					printf("SetEvent ghEventWorkForCpu failed (%d)\n", GetLastError());
 					return -5;
 				}
-				resultArrayIndex += NumOfRandomsInWorkQuanta;
+				resultArrayIndex_CPU += NumOfRandomsInWorkQuanta;
 				inputWorkIndex++;
 			}
 		}
 		if (NumOfWorkItems > 1) {
 			if (genSpec.resultDestination == ResultInSystemMemory && !genSpec.CudaGPU.helpOthers)
 			{
-			}	// don't generate a CudaGPU work item, which will subsequently never generate another one ever
-			else if (genSpec.resultDestination == ResultInCudaGPUMemory ||
+				// don't generate a CudaGPU work item, which will subsequently never generate another work item ever
+			}
+			else if (genSpec.resultDestination == ResultInCudaGpuMemory ||
 				(genSpec.resultDestination == ResultInSystemMemory && genSpec.CudaGPU.helpOthers) ||
 				(genSpec.resultDestination == ResultInEachDevicesMemory && !genSpec.CudaGPU.helpOthers)) {
 				if ((resultArrayIndex_GPU + NumOfRandomsInWorkQuanta) < genSpec.CudaGPU.maxRandoms) {
 					//printf("First CudaGPU work item\n");
-					workCudaGPU.workerType = 1;						// CudaGPU   TODO: Create enum {CPU, CUDA_GPU, OpenCL_GPU, FPGA, etc} for all types 
-					workCudaGPU.amountOfWork = NumOfRandomsInWorkQuanta;
-					workCudaGPU.b_GPU = (char *)(&(randomFloatArray_GPU[resultArrayIndex_GPU]));
+					workCudaGPU.WorkerType = ComputeEngine::CUDA_GPU;
+					workCudaGPU.AmountOfWork = NumOfRandomsInWorkQuanta;
+					workCudaGPU.DevicePtr = (char *)(&(randomFloatArray_GPU[resultArrayIndex_GPU]));
 					if (genSpec.resultDestination == ResultInSystemMemory && genSpec.CudaGPU.helpOthers) {
-						workCudaGPU.b_CPU = (char *)(&(randomFloatArray[resultArrayIndex]));
-						resultArrayIndex += NumOfRandomsInWorkQuanta;		// TODO: Figure out how to handle different size workQuanta between CPU and GPU and knowing when work is done
+						workCudaGPU.HostPtr = (char *)(&(randomFloatArray[resultArrayIndex_CPU]));
+						resultArrayIndex_CPU += NumOfRandomsInWorkQuanta;		// TODO: Figure out how to handle different size workQuanta between CPU and GPU and knowing when work is done
 					}
 					else {
-						workCudaGPU.b_CPU = NULL;
+						workCudaGPU.HostPtr = NULL;
 						resultArrayIndex_GPU += NumOfRandomsInWorkQuanta;
 					}
 					//printf("Cuda GPU work item: amountOfWork = %d at GPU memory address %p\n", workCudaGPU.amountOfWork, workCudaGPU.b_GPU);
 					//printf("Event set for work item for CUDA GPU\n");
-					if (!SetEvent(ghEventWorkForCudaGpu))	// Set one event to the signaled state
+					if (!SetEvent(ghEventWorkForCudaGpu))		// signal that CudaGpu has a work item to work on
 					{
 						printf("SetEvent ghEventWorkForCudaGpu failed (%d)\n", GetLastError());
 						return -6;
@@ -270,9 +271,9 @@ int runLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, u
 				if (inputWorkIndex < NumOfWorkItems)	// Create new work item for CPU
 				{
 					//printf("More CPU work item\n");
-					workCPU.workerType = 0;
-					workCPU.amountOfWork = NumOfRandomsInWorkQuanta;
-					workCPU.b_CPU = (char *)(&(randomFloatArray[resultArrayIndex]));
+					workCPU.WorkerType = ComputeEngine::CPU;
+					workCPU.AmountOfWork = NumOfRandomsInWorkQuanta;
+					workCPU.HostPtr = (char *)(&(randomFloatArray[resultArrayIndex_CPU]));
 					if (!SetEvent(ghEventWorkForCpu))	// Set one event to the signaled state
 					{
 						printf("SetEvent ghEventWorkForCpu failed (%d)\n", GetLastError());
@@ -280,7 +281,7 @@ int runLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, u
 					}
 					inputWorkIndex++;
 					//printf("Gave new work item to CPU. resultArrayIndex = %zd. Completed %zd work items\n", resultArrayIndex, workCompletedByCPU);
-					resultArrayIndex += NumOfRandomsInWorkQuanta;
+					resultArrayIndex_CPU += NumOfRandomsInWorkQuanta;
 				}
 				numCpuWorkItemsDone++;
 				break;
@@ -288,19 +289,19 @@ int runLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, u
 			case WAIT_OBJECT_0 + 1:
 				//printf("ghEventsComputeDone CUDA GPU event was signaled.\n");
 				if (inputWorkIndex < NumOfWorkItems) {
-					if (genSpec.resultDestination == ResultInCudaGPUMemory ||
+					if (genSpec.resultDestination == ResultInCudaGpuMemory ||
 						(genSpec.resultDestination == ResultInSystemMemory && genSpec.CudaGPU.helpOthers) ||
 						(genSpec.resultDestination == ResultInEachDevicesMemory && !genSpec.CudaGPU.helpOthers)) {
 						if ((resultArrayIndex_GPU + NumOfRandomsInWorkQuanta) < genSpec.CudaGPU.maxRandoms) {
 							//printf("More CudaGPU work item\n");
-							workCudaGPU.workerType = 1;
-							workCudaGPU.amountOfWork = NumOfRandomsInWorkQuanta;
+							workCudaGPU.WorkerType = ComputeEngine::CUDA_GPU;
+							workCudaGPU.AmountOfWork = NumOfRandomsInWorkQuanta;
 							//printf("resultArrayIndex_GPU = %zd\n", resultArrayIndex_GPU);
-							workCudaGPU.b_GPU = (char *)(&(randomFloatArray_GPU[resultArrayIndex_GPU]));
+							workCudaGPU.DevicePtr = (char *)(&(randomFloatArray_GPU[resultArrayIndex_GPU]));
 							if (genSpec.resultDestination == ResultInSystemMemory && genSpec.CudaGPU.helpOthers)
-								workCudaGPU.b_CPU = (char *)(&(randomFloatArray[resultArrayIndex]));
+								workCudaGPU.HostPtr = (char *)(&(randomFloatArray[resultArrayIndex_CPU]));
 							else
-								workCudaGPU.b_CPU = NULL;
+								workCudaGPU.HostPtr = NULL;
 							//printf("Created work items for CUDA GPU\n");
 							if (!SetEvent(ghEventWorkForCudaGpu))	// Set one event to the signaled state
 							{
@@ -310,7 +311,7 @@ int runLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, u
 							inputWorkIndex++;
 							//printf("Gave new work item to GPU. resultArrayIndex = %zd. Completed %zd work items\n", resultArrayIndex_GPU, numGpuWorkItemsDone);
 							if (genSpec.resultDestination == ResultInSystemMemory && genSpec.CudaGPU.helpOthers)
-								resultArrayIndex += NumOfRandomsInWorkQuanta;	// don't advance GPU index to reuse the same GPU array
+								resultArrayIndex_CPU += NumOfRandomsInWorkQuanta;	// don't advance GPU index to reuse the same GPU array
 							else
 								resultArrayIndex_GPU += NumOfRandomsInWorkQuanta;
 						}
@@ -340,21 +341,21 @@ int runLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, u
 		{
 			timer.timeStamp();
 			printf("To generate randoms by CPU only, ran at %zd floats/second\n", (size_t)((double)NumOfWorkItems * NumOfRandomsInWorkQuanta / timer.getAverageDeltaInSeconds()));
-			printf("runLoadBalancerThread: Ran successfully. CPU generated %zd randoms, CudaGPU generated %zd randoms\n", resultArrayIndex, resultArrayIndex_GPU);
+			printf("runLoadBalancerThread: Ran successfully. CPU generated %zd randoms, CudaGPU generated %zd randoms\n", resultArrayIndex_CPU, resultArrayIndex_GPU);
 			benchmarkFile << NumOfWorkItems * NumOfRandomsInWorkQuanta << "\t" << (size_t)((double)NumOfWorkItems * NumOfRandomsInWorkQuanta / timer.getAverageDeltaInSeconds()) << endl;
 		}
 		else if ((genSpec.resultDestination == ResultInEachDevicesMemory && !genSpec.CudaGPU.helpOthers) ||
-			(genSpec.resultDestination == ResultInCudaGPUMemory && !genSpec.CudaGPU.helpOthers))
+			(genSpec.resultDestination == ResultInCudaGpuMemory && !genSpec.CudaGPU.helpOthers))
 		{
 			timer.timeStamp();
 			printf("Just generation of randoms runs at %zd floats/second\n", (size_t)((double)NumOfWorkItems * NumOfRandomsInWorkQuanta / timer.getAverageDeltaInSeconds()));
 			printf("runLoadBalancerThread: Ran successfully. CPU generated %zd randoms, CudaGPU generated %zd randoms.\nAsked to generate %zd, generated %zd\n",
-				resultArrayIndex, resultArrayIndex_GPU, NumOfRandomsToGenerate, resultArrayIndex + resultArrayIndex_GPU);
+				resultArrayIndex_CPU, resultArrayIndex_GPU, NumOfRandomsToGenerate, resultArrayIndex_CPU + resultArrayIndex_GPU);
 			benchmarkFile << NumOfWorkItems * NumOfRandomsInWorkQuanta << "\t" << (size_t)((double)NumOfWorkItems * NumOfRandomsInWorkQuanta / timer.getAverageDeltaInSeconds()) << endl;
 			timer.reset();
 			timer.timeStamp();
 			// Copy all of the GPU generated randoms for verification of correctness by some rudamentary statistics
-			copyCudaToSystemMemory(&randomFloatArray[resultArrayIndex], randomFloatArray_GPU, resultArrayIndex_GPU * sizeof(float));
+			copyCudaToSystemMemory(&randomFloatArray[resultArrayIndex_CPU], randomFloatArray_GPU, resultArrayIndex_GPU * sizeof(float));
 			timer.timeStamp();
 			//printf("Copy from CudaGPU to CPU runs at %zd bytes/second\n", (size_t)((double)(resultArrayIndex_GPU * sizeof(float)) / timer.getAverageDeltaInSeconds()));
 		}
@@ -363,9 +364,9 @@ int runLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, u
 		double average = 0.0;
 		size_t totalRandomsGenerated = 0;
 		if (genSpec.resultDestination == ResultInSystemMemory)
-			totalRandomsGenerated = resultArrayIndex;
+			totalRandomsGenerated = resultArrayIndex_CPU;
 		else
-			totalRandomsGenerated = resultArrayIndex + resultArrayIndex_GPU;
+			totalRandomsGenerated = resultArrayIndex_CPU + resultArrayIndex_GPU;
 		for (size_t i = 0; i < totalRandomsGenerated; i++)
 			average += randomFloatArray[i];
 		average /= totalRandomsGenerated;
@@ -431,7 +432,7 @@ int runLoadBalancerThreadPre(RandomsToGenerate& genSpec, ofstream& benchmarkFile
 		// TODO: Need to NOT free that memory and make it the responsibility of the user, but provide an interface to de-allocate thru for each device.
 		return runLoadBalancerThread(genSpec, benchmarkFile, NumTimes);
 	}
-	else if (genSpec.resultDestination == ResultInCudaGPUMemory)
+	else if (genSpec.resultDestination == ResultInCudaGpuMemory)
 	{
 		printf("runLoadBalancerThreadPre with ResultInCudaGPUMemory\n");
 		// TODO: Need to return an address, number of randoms returned and the size of memory allocated.
@@ -483,18 +484,21 @@ int benchmarkLoadBalancer()
 																	// !! TODO: Create a structure of time stamp and string, to be able to create an array of time stamps and their identification with additional information
 																	// !! TODO: This will help debug where the delays are and help determine if the issue is in my code or in TBB itself, as we expect no iterference between cudaGPU and MKL
 																	// !! TODO: when the storage of randoms is in their respective local memories. The timestamp structure may have to be a global to avoid passing it into all layers of hierarchy.
-	genSpec.CPU.workQuanta = 0;		// indicates user doesn't know what to set 
-	genSpec.CudaGPU.workQuanta = 0;
 	genSpec.randomsToGenerate = maxRandomsToGenerate;
-	genSpec.CPU.memoryCapacity     = (size_t)16 * 1024 * 1024 * 1024;
+	genSpec.resultDestination = ResultInEachDevicesMemory;
+
+	genSpec.CPU.workQuanta = 0;		// indicates user is ok with automatic determination
+	genSpec.CPU.memoryCapacity = (size_t)16 * 1024 * 1024 * 1024;
+	genSpec.CPU.maxRandoms = (size_t)(genSpec.CPU.memoryCapacity * 0.50) / sizeof(float);	// use up to 50% of CPU memory for randoms
+	genSpec.CPU.helpOthers = false;
+	genSpec.CPU.prngSeed = std::time(0);
+
+	genSpec.CudaGPU.workQuanta = 0;		// indicates user is ok with automatic determination 
 	genSpec.CudaGPU.memoryCapacity = (size_t)2  * 1024 * 1024 * 1024;
-	genSpec.CPU.maxRandoms     = (size_t)(genSpec.CPU.memoryCapacity     * 0.50) / sizeof(float);	// use up to 50% of CPU memory for randoms
 	genSpec.CudaGPU.maxRandoms = (size_t)(genSpec.CudaGPU.memoryCapacity * 0.75) / sizeof(float);	// use up to 75% of GPU memory for randoms
-	genSpec.resultDestination  = ResultInEachDevicesMemory;
 	genSpec.CudaGPU.helpOthers = false;
-	genSpec.CPU.helpOthers     = false;
-	genSpec.CPU.prngSeed     = std::time(0);
 	genSpec.CudaGPU.prngSeed = std::time(0) + 10;
+
 	genSpec.generated.CPU.buffer = NULL;		// NULL implies allocate memory. non-NULL implies reuse the buffer provided
 	genSpec.generated.CPU.numberOfRandoms = 0;
 	genSpec.generated.CudaGPU.buffer = NULL;	// NULL implies allocate memory. non-NULL implies reuse the buffer provided
@@ -541,7 +545,7 @@ int benchmarkLoadBalancer()
 	}
 	delete[] genSpec.generated.CPU.buffer;
 	if ((genSpec.resultDestination == ResultInEachDevicesMemory && !genSpec.CudaGPU.helpOthers) ||
-		genSpec.resultDestination == ResultInCudaGPUMemory)
+		genSpec.resultDestination == ResultInCudaGpuMemory)
 		freeCudaMemory(genSpec.generated.CudaGPU.buffer);
 
 	benchmarkFile.close();
@@ -577,7 +581,7 @@ DWORD WINAPI ThreadMultiCoreCpuCompute(LPVOID lpParam)
 		unsigned int rngSeed = 2;
 		int rngType = VSL_BRNG_MCG59;
 		int numCores = 4;
-		int rngResult = mklRandomFloatParallel_SkipAhead((float *)workCPU.b_CPU, workCPU.amountOfWork, rngSeed, rngType, numCores);
+		int rngResult = mklRandomFloatParallel_SkipAhead((float *)workCPU.HostPtr, workCPU.AmountOfWork, rngSeed, rngType, numCores);
 		// Signal the associated event to indicate work item has been finished
 		//printf("ThreadMultiCoreCpuCompute %d done with work item. Signaling dispatcher\n", GetCurrentThreadId());
 		if (!SetEvent(ghEventsComputeDone[MultiCoreCpuEvent]))	// Set one event to the signaled state
@@ -615,7 +619,7 @@ DWORD WINAPI ThreadCudaGpuCompute(LPVOID lpParam)
 		// TODO: Do the GPU work requested in the work item
 		//Sleep(2000);
 		bool verify = false;
-		GenerateRandFloatCuda((float *)workCudaGPU.b_GPU, (float *)workCudaGPU.b_CPU, gCudaRngSupport->prngGPU, workCudaGPU.amountOfWork, verify, gCudaRngSupport->prngCPU);
+		GenerateRandFloatCuda((float *)workCudaGPU.DevicePtr, (float *)workCudaGPU.HostPtr, gCudaRngSupport->prngGPU, workCudaGPU.AmountOfWork, verify, gCudaRngSupport->prngCPU);
 
 		// Signal the associated event to indicate work item has been finished
 		//printf("ThreadCudaGpuCompute %d done with work item. Signaling dispatcher\n", GetCurrentThreadId());

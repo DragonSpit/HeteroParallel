@@ -168,7 +168,7 @@ int benchmarkGraph()
 	genSpec.CudaGPU.memoryCapacity = (size_t)2 * 1024 * 1024 * 1024;
 	genSpec.CPU.maxRandoms = (size_t)(genSpec.CPU.memoryCapacity     * 0.50) / sizeof(float);	// use up to 50% of CPU memory for randoms
 	genSpec.CudaGPU.maxRandoms = (size_t)(genSpec.CudaGPU.memoryCapacity * 0.75) / sizeof(float);	// use up to 75% of GPU memory for randoms
-	genSpec.resultDestination = ResultInCudaGPUMemory;
+	genSpec.resultDestination = ResultInCudaGpuMemory;
 	genSpec.CudaGPU.helpOthers = false;
 	genSpec.CPU.helpOthers = false;
 	genSpec.CPU.prngSeed = std::time(0);
@@ -219,7 +219,7 @@ int benchmarkGraph()
 	}
 	delete[] genSpec.generated.CPU.buffer;
 	if ((genSpec.resultDestination == ResultInEachDevicesMemory && !genSpec.CudaGPU.helpOthers) ||
-		 genSpec.resultDestination == ResultInCudaGPUMemory)
+		 genSpec.resultDestination == ResultInCudaGpuMemory)
 		freeCudaMemory(genSpec.generated.CudaGPU.buffer);
 
 	benchmarkFile.close();
