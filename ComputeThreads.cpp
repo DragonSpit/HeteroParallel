@@ -15,51 +15,43 @@
 
 using namespace std;
 
-extern void GenerateRandFloatCuda(float *devMemPtr, float *sysMemPtr, curandGenerator_t& prngGPU, size_t numRandoms, bool verify, curandGenerator_t& prngCPU);
 extern void copyCudaToSystemMemory(void *systemMemPtr, void *cudaMemPtr, size_t numBytes);
-extern int mklRandomFloatParallel_SkipAhead(float  * RngArray, size_t NumValues, unsigned int seed, int RngType, int NumCores);
 
-WorkType workCPU;				// work item for CPU to do. This is to be setup before ghEventWorkForCpu gets set to notify the CPU thread to start working on it
-HANDLE ghEventWorkForCpu;		// when asserted, work item for CPU      is ready
-WorkType workCudaGPU;			// work item for Cuda GPU to do. This is to be setup before ghEventWorkForCudaGpu gets set to notify the CPU thread to start working on it
-HANDLE ghEventWorkForCudaGpu;	// when asserted, work item for Cuda GPU is ready
+extern WorkType workCPU;						// work item for CPU to do. This is to be setup before ghEventHaveWorkItemForCpu gets set to notify the CPU thread to start working on it
+extern HANDLE ghEventHaveWorkItemForCpu;		// when asserted, work item for CPU      is ready
+extern WorkType workCudaGPU;					// work item for Cuda GPU to do. This is to be setup before ghEventHaveWorkItemForCudaGpu gets set to notify the CPU thread to start working on it
+extern HANDLE ghEventHaveWorkItemForCudaGpu;	// when asserted, work item for Cuda GPU is ready
+extern DWORD WINAPI ThreadMultiCoreCpuCompute(LPVOID);
+extern DWORD WINAPI ThreadCudaGpuCompute(LPVOID);
 
-CudaRngSupport * gCudaRngSupport = NULL;	// TODO: Make sure to deallocate it once done
+extern CudaRngSupport * gCudaRngSupport;	// TODO: Make sure to deallocate it once done
 
-const size_t NumComputeDoneEvents = 4;
-const size_t MultiCoreCpuEvent = 0;
-const size_t CudaGpuEvent      = 1;
-const size_t OpenClGpuEvent    = 2;
-const size_t OpenClFpgaEvent   = 3;
-HANDLE ghEventsComputeDone[NumComputeDoneEvents];	// 0 - MultiCoreCpu, 1 - CudaGpu, 2 - OpenClGpu, 3 - OpenClFpga
+HANDLE ghEventsComputeDone[NumComputeDoneEvents];	// 0 - CPU, 1 - CudaGpu, 2 - OpenClGpu, 3 - OpenClFpga
 bool gRunComputeWorkers = true;
-
-DWORD WINAPI ThreadMultiCoreCpuCompute(LPVOID);
-DWORD WINAPI ThreadCudaGpuCompute(LPVOID);
 
 int loadBalancerInit(void)
 {
 	HANDLE hThread;
 	DWORD i, dwThreadID;
 
-	ghEventWorkForCpu = CreateEvent(
+	ghEventHaveWorkItemForCpu = CreateEvent(
 		NULL,   // default security attributes
 		FALSE,  // auto-reset event object
 		FALSE,  // initial state is nonsignaled
 		NULL);  // unnamed object
 
-	if (ghEventWorkForCpu == NULL)
+	if (ghEventHaveWorkItemForCpu == NULL)
 	{
 		printf("CreateEvent error: %d\n", GetLastError());
 		return -2;
 	}
-	ghEventWorkForCudaGpu = CreateEvent(
+	ghEventHaveWorkItemForCudaGpu = CreateEvent(
 		NULL,   // default security attributes
 		FALSE,  // auto-reset event object
 		FALSE,  // initial state is nonsignaled
 		NULL);  // unnamed object
 
-	if (ghEventWorkForCudaGpu == NULL)
+	if (ghEventHaveWorkItemForCudaGpu == NULL)
 	{
 		printf("CreateEvent error: %d\n", GetLastError());
 		return -2;
@@ -203,7 +195,7 @@ int runLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, u
 				workCPU.AmountOfWork = NumOfRandomsInWorkQuanta;
 				workCPU.HostPtr = (char *)(&(randomFloatArray[resultArrayIndex_CPU]));
 				//printf("Event set for work item for MultiCore CPU\n");
-				if (!SetEvent(ghEventWorkForCpu))	// signal that CPU has a work item to work on
+				if (!SetEvent(ghEventHaveWorkItemForCpu))	// signal that CPU has a work item to work on
 				{
 					printf("SetEvent ghEventWorkForCpu failed (%d)\n", GetLastError());
 					return -5;
@@ -218,13 +210,13 @@ int runLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, u
 				// don't generate a CudaGPU work item, which will subsequently never generate another work item ever
 			}
 			else if (genSpec.resultDestination == ResultInCudaGpuMemory ||
-				(genSpec.resultDestination == ResultInSystemMemory && genSpec.CudaGPU.helpOthers) ||
-				(genSpec.resultDestination == ResultInEachDevicesMemory && !genSpec.CudaGPU.helpOthers)) {
+				    (genSpec.resultDestination == ResultInSystemMemory      &&  genSpec.CudaGPU.helpOthers) ||
+				    (genSpec.resultDestination == ResultInEachDevicesMemory && !genSpec.CudaGPU.helpOthers)) {
 				if ((resultArrayIndex_GPU + NumOfRandomsInWorkQuanta) < genSpec.CudaGPU.maxRandoms) {
 					//printf("First CudaGPU work item\n");
-					workCudaGPU.WorkerType = ComputeEngine::CUDA_GPU;
+					workCudaGPU.WorkerType   = ComputeEngine::CUDA_GPU;
 					workCudaGPU.AmountOfWork = NumOfRandomsInWorkQuanta;
-					workCudaGPU.DevicePtr = (char *)(&(randomFloatArray_GPU[resultArrayIndex_GPU]));
+					workCudaGPU.DevicePtr    = (char *)(&(randomFloatArray_GPU[resultArrayIndex_GPU]));
 					if (genSpec.resultDestination == ResultInSystemMemory && genSpec.CudaGPU.helpOthers) {
 						workCudaGPU.HostPtr = (char *)(&(randomFloatArray[resultArrayIndex_CPU]));
 						resultArrayIndex_CPU += NumOfRandomsInWorkQuanta;		// TODO: Figure out how to handle different size workQuanta between CPU and GPU and knowing when work is done
@@ -235,9 +227,9 @@ int runLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, u
 					}
 					//printf("Cuda GPU work item: amountOfWork = %d at GPU memory address %p\n", workCudaGPU.amountOfWork, workCudaGPU.b_GPU);
 					//printf("Event set for work item for CUDA GPU\n");
-					if (!SetEvent(ghEventWorkForCudaGpu))		// signal that CudaGpu has a work item to work on
+					if (!SetEvent(ghEventHaveWorkItemForCudaGpu))		// signal that CudaGpu has a work item to work on
 					{
-						printf("SetEvent ghEventWorkForCudaGpu failed (%d)\n", GetLastError());
+						printf("SetEvent ghEventHaveWorkItemForCudaGpu failed (%d)\n", GetLastError());
 						return -6;
 					}
 					inputWorkIndex++;
@@ -266,7 +258,7 @@ int runLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, u
 			switch (dwEvent)
 			{
 				// ghEventsComputeDone[0] (CPU) was signaled => done with its work item
-			case WAIT_OBJECT_0 + 0:
+			case WAIT_OBJECT_0 + CPU:
 				//printf("ghEventsComputeDone CPU event was signaled.\n");
 				if (inputWorkIndex < NumOfWorkItems)	// Create new work item for CPU
 				{
@@ -274,7 +266,7 @@ int runLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, u
 					workCPU.WorkerType = ComputeEngine::CPU;
 					workCPU.AmountOfWork = NumOfRandomsInWorkQuanta;
 					workCPU.HostPtr = (char *)(&(randomFloatArray[resultArrayIndex_CPU]));
-					if (!SetEvent(ghEventWorkForCpu))	// Set one event to the signaled state
+					if (!SetEvent(ghEventHaveWorkItemForCpu))	// Set one event to the signaled state
 					{
 						printf("SetEvent ghEventWorkForCpu failed (%d)\n", GetLastError());
 						return -5;
@@ -286,26 +278,26 @@ int runLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, u
 				numCpuWorkItemsDone++;
 				break;
 				// ghEventsComputeDone[1] (CUDA GPU) was signaled => done with its work item
-			case WAIT_OBJECT_0 + 1:
+			case WAIT_OBJECT_0 + CUDA_GPU:
 				//printf("ghEventsComputeDone CUDA GPU event was signaled.\n");
 				if (inputWorkIndex < NumOfWorkItems) {
 					if (genSpec.resultDestination == ResultInCudaGpuMemory ||
-						(genSpec.resultDestination == ResultInSystemMemory && genSpec.CudaGPU.helpOthers) ||
-						(genSpec.resultDestination == ResultInEachDevicesMemory && !genSpec.CudaGPU.helpOthers)) {
+					   (genSpec.resultDestination == ResultInSystemMemory      &&  genSpec.CudaGPU.helpOthers) ||
+					   (genSpec.resultDestination == ResultInEachDevicesMemory && !genSpec.CudaGPU.helpOthers)) {
 						if ((resultArrayIndex_GPU + NumOfRandomsInWorkQuanta) < genSpec.CudaGPU.maxRandoms) {
 							//printf("More CudaGPU work item\n");
-							workCudaGPU.WorkerType = ComputeEngine::CUDA_GPU;
+							workCudaGPU.WorkerType   = ComputeEngine::CUDA_GPU;
 							workCudaGPU.AmountOfWork = NumOfRandomsInWorkQuanta;
+							workCudaGPU.DevicePtr    = (char *)(&(randomFloatArray_GPU[resultArrayIndex_GPU]));
 							//printf("resultArrayIndex_GPU = %zd\n", resultArrayIndex_GPU);
-							workCudaGPU.DevicePtr = (char *)(&(randomFloatArray_GPU[resultArrayIndex_GPU]));
 							if (genSpec.resultDestination == ResultInSystemMemory && genSpec.CudaGPU.helpOthers)
 								workCudaGPU.HostPtr = (char *)(&(randomFloatArray[resultArrayIndex_CPU]));
 							else
 								workCudaGPU.HostPtr = NULL;
 							//printf("Created work items for CUDA GPU\n");
-							if (!SetEvent(ghEventWorkForCudaGpu))	// Set one event to the signaled state
+							if (!SetEvent(ghEventHaveWorkItemForCudaGpu))	// Set one event to the signaled state
 							{
-								printf("SetEvent ghEventWorkForCudaGpu failed (%d)\n", GetLastError());
+								printf("SetEvent ghEventHaveWorkItemForCudaGpu failed (%d)\n", GetLastError());
 								return -6;
 							}
 							inputWorkIndex++;
@@ -345,7 +337,7 @@ int runLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, u
 			benchmarkFile << NumOfWorkItems * NumOfRandomsInWorkQuanta << "\t" << (size_t)((double)NumOfWorkItems * NumOfRandomsInWorkQuanta / timer.getAverageDeltaInSeconds()) << endl;
 		}
 		else if ((genSpec.resultDestination == ResultInEachDevicesMemory && !genSpec.CudaGPU.helpOthers) ||
-			(genSpec.resultDestination == ResultInCudaGpuMemory && !genSpec.CudaGPU.helpOthers))
+			     (genSpec.resultDestination == ResultInCudaGpuMemory     && !genSpec.CudaGPU.helpOthers))
 		{
 			timer.timeStamp();
 			printf("Just generation of randoms runs at %zd floats/second\n", (size_t)((double)NumOfWorkItems * NumOfRandomsInWorkQuanta / timer.getAverageDeltaInSeconds()));
@@ -382,8 +374,8 @@ int loadBalancerShutdown(void)
 	// TODO: How do we shut down threads that are blocked waiting on work events? Maybe by creating null/zero work items.
 
 	// Close event handles
-	CloseHandle(ghEventWorkForCpu);
-	CloseHandle(ghEventWorkForCudaGpu);
+	CloseHandle(ghEventHaveWorkItemForCpu);
+	CloseHandle(ghEventHaveWorkItemForCudaGpu);
 	for (size_t i = 0; i < NumComputeDoneEvents; i++)
 		CloseHandle(ghEventsComputeDone[i]);
 
@@ -552,83 +544,3 @@ int benchmarkLoadBalancer()
 
 	return 0;
 }
-
-// Thread waits to receive a single event for work to be performed, does the work, and sets a compute-done event when that work has been completed
-DWORD WINAPI ThreadMultiCoreCpuCompute(LPVOID lpParam)
-{
-	UNREFERENCED_PARAMETER(lpParam);	// lpParam not used in this example
-	DWORD dwWaitResult;
-
-	while (gRunComputeWorkers)
-	{
-		//printf("ThreadMultiCoreCpuCompute %d waiting for MultiCore CPU work item...\n", GetCurrentThreadId());
-
-		dwWaitResult = WaitForSingleObject(ghEventWorkForCpu, INFINITE);	// forever wait for CPU work item
-
-		switch (dwWaitResult)
-		{
-			// Event object was signaled
-		case WAIT_OBJECT_0:
-			//printf("ThreadMultiCoreCpuCompute %d received work item to do\n", GetCurrentThreadId());
-			break;
-			// An error occurred
-		default:
-			printf("ThreadMultiCoreCpuCompute Wait error (%d)\n", GetLastError());
-			return 1;
-		}
-
-		// TODO: Do the CPU work requested in the work item
-		unsigned int rngSeed = 2;
-		int rngType = VSL_BRNG_MCG59;
-		int numCores = 4;
-		int rngResult = mklRandomFloatParallel_SkipAhead((float *)workCPU.HostPtr, workCPU.AmountOfWork, rngSeed, rngType, numCores);
-		// Signal the associated event to indicate work item has been finished
-		//printf("ThreadMultiCoreCpuCompute %d done with work item. Signaling dispatcher\n", GetCurrentThreadId());
-		if (!SetEvent(ghEventsComputeDone[MultiCoreCpuEvent]))	// Set one event to the signaled state
-		{
-			printf("SetEvent[%zd] failed (%d)\n", MultiCoreCpuEvent, GetLastError());
-			return 2;
-		}
-	}
-	return 0;
-}
-
-DWORD WINAPI ThreadCudaGpuCompute(LPVOID lpParam)
-{
-	UNREFERENCED_PARAMETER(lpParam);	// lpParam not used in this example
-	DWORD dwWaitResult;
-
-	while (gRunComputeWorkers)
-	{
-		//printf("ThreadCudaGpuCompute %d waiting for CUDA GPU work item...\n", GetCurrentThreadId());
-
-		dwWaitResult = WaitForSingleObject(ghEventWorkForCudaGpu, INFINITE);	// forever wait for CPU work item
-
-		switch (dwWaitResult)
-		{
-			// Event object was signaled
-		case WAIT_OBJECT_0:
-			//printf("ThreadCudaGpuCompute %d received work item to do\n", GetCurrentThreadId());
-			break;
-			// An error occurred
-		default:
-			printf("ThreadCudaGpuCompute Wait error (%d)\n", GetLastError());
-			return 1;
-		}
-
-		// TODO: Do the GPU work requested in the work item
-		//Sleep(2000);
-		bool verify = false;
-		GenerateRandFloatCuda((float *)workCudaGPU.DevicePtr, (float *)workCudaGPU.HostPtr, gCudaRngSupport->prngGPU, workCudaGPU.AmountOfWork, verify, gCudaRngSupport->prngCPU);
-
-		// Signal the associated event to indicate work item has been finished
-		//printf("ThreadCudaGpuCompute %d done with work item. Signaling dispatcher\n", GetCurrentThreadId());
-		if (!SetEvent(ghEventsComputeDone[CudaGpuEvent]))	// Set one event to the signaled state
-		{
-			printf("SetEvent[%zd] failed (%d)\n", CudaGpuEvent, GetLastError());
-			return 2;
-		}
-	}
-	return 0;
-}
-

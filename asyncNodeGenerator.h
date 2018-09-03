@@ -20,6 +20,8 @@ enum ComputeEngine {
 	CPU = 0, CUDA_GPU, OPENCL_GPU, FPGA
 };
 
+const size_t NumComputeDoneEvents = 4;
+
 enum ResultDestination {
 	ResultInEachDevicesMemory = 0, ResultInSystemMemory, ResultInCudaGpuMemory, ResultInOpenclGpuMemory, ResultInFpgaMemory
 };
