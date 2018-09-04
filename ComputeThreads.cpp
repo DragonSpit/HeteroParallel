@@ -17,14 +17,14 @@ using namespace std;
 
 extern void copyCudaToSystemMemory(void *systemMemPtr, void *cudaMemPtr, size_t numBytes);
 
-extern WorkType workCPU;						// work item for CPU to do. This is to be setup before ghEventHaveWorkItemForCpu gets set to notify the CPU thread to start working on it
+extern WorkItemType workCPU;					// work item for CPU to do. This is to be setup before ghEventHaveWorkItemForCpu gets set to notify the CPU thread to start working on it
 extern HANDLE ghEventHaveWorkItemForCpu;		// when asserted, work item for CPU      is ready
-extern WorkType workCudaGPU;					// work item for Cuda GPU to do. This is to be setup before ghEventHaveWorkItemForCudaGpu gets set to notify the CPU thread to start working on it
+extern WorkItemType workCudaGPU;				// work item for Cuda GPU to do. This is to be setup before ghEventHaveWorkItemForCudaGpu gets set to notify the CPU thread to start working on it
 extern HANDLE ghEventHaveWorkItemForCudaGpu;	// when asserted, work item for Cuda GPU is ready
 extern DWORD WINAPI ThreadMultiCoreCpuCompute(LPVOID);
 extern DWORD WINAPI ThreadCudaGpuCompute(LPVOID);
 
-extern CudaRngSupport * gCudaRngSupport;	// TODO: Make sure to deallocate it once done
+extern CudaRngEncapsulation * gCudaRngSupport;	// TODO: Make sure to deallocate it once done
 
 HANDLE ghEventsComputeDone[NumComputeDoneEvents];	// 0 - CPU, 1 - CudaGpu, 2 - OpenClGpu, 3 - OpenClFpga
 bool gRunComputeWorkers = true;
@@ -135,40 +135,40 @@ int runLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, u
 	// TODO: Only allocate system memory when we are going to put randoms into it
 	printf("After allocation of NumOfBytesForRandomArray = %zd at CPU memory location = %p\n", NumOfRandomsToGenerate * sizeof(float), randomFloatArray);
 
-
+	// Determine how much GPU memory to allocate
 	size_t preallocateGPUmemorySize;
 	if (genSpec.resultDestination == ResultInSystemMemory && genSpec.CudaGPU.helpOthers)
 		preallocateGPUmemorySize = NumOfRandomsInWorkQuanta * sizeof(float);	// since GPU is a helper, only pre-allocate workQuanta size in GPU memory and use the same memory buffer for each work item
 	else if (genSpec.resultDestination == ResultInSystemMemory && !genSpec.CudaGPU.helpOthers)
 		preallocateGPUmemorySize = 0;
-	else if (genSpec.resultDestination == ResultInEachDevicesMemory && !genSpec.CudaGPU.helpOthers)
-		preallocateGPUmemorySize = genSpec.CudaGPU.maxRandoms * sizeof(float);
-	else if (genSpec.resultDestination == ResultInCudaGpuMemory)
+	else if ((genSpec.resultDestination == ResultInEachDevicesMemory && !genSpec.CudaGPU.helpOthers) ||
+		     (genSpec.resultDestination == ResultInCudaGpuMemory))
 		preallocateGPUmemorySize = genSpec.CudaGPU.maxRandoms * sizeof(float);
 	else {
 		printf("Error: Unsupported configuration\n");
 		return -1;
 	}
 	printf("Allocating CudaGPU memory of %zd bytes\n", preallocateGPUmemorySize);
-	bool freeCudaMemory = ((genSpec.resultDestination == ResultInEachDevicesMemory && !genSpec.CudaGPU.helpOthers) || (genSpec.resultDestination == ResultInCudaGpuMemory))
-		? false : true;
-	// TODO: This is really hacky! We need a way to set the cudaBuffer memory pointer inside AsyncGenerateNodeActivity class in a much cleaner way, possibly in constructor
-	if (genSpec.generated.CudaGPU.buffer != NULL)
-		preallocateGPUmemorySize = 0;
-
-	//AsyncGenerateNodeActivity asyncNodeActivityGPU(AsyncGenerateNodeActivity::CudaGPU, preallocateGPUmemorySize, freeCudaMemory, genSpec.CudaGPU.prngSeed);	// pre-allocate GPU memory, since it takes forever to allocate
 
 	int argc = 0;
 	const char **argv = NULL;
-	unsigned long long prngSeed = 2;
 	int m_CudaDeviceID = findCudaDevice(argc, (const char **)argv);	// TODO: need to do this operation only once
-	gCudaRngSupport = new CudaRngSupport(prngSeed, preallocateGPUmemorySize, freeCudaMemory);
 
+	// TODO: Something is weird in the following section with memory allocation. gCudaRngSupport is never deleted!
+	unsigned long long prngSeed = 2;
+	bool mustFreeCudaMemory = ((genSpec.resultDestination == ResultInEachDevicesMemory && !genSpec.CudaGPU.helpOthers) ||
+		(genSpec.resultDestination == ResultInCudaGpuMemory))
+		? false : true;
+	if (genSpec.generated.CudaGPU.buffer != NULL)
+		preallocateGPUmemorySize = 0;
+
+	gCudaRngSupport = new CudaRngEncapsulation(prngSeed, preallocateGPUmemorySize, mustFreeCudaMemory);
 	// TODO: This is really hacky! We need a way to set the cudaBuffer memory pointer inside AsyncGenerateNodeActivity class in a much cleaner way, possibly in constructor
+	// TODO: This is really hacky to support running across multiple loops, calling this method several times, doing "new CudaRngEncapsulation" in each loop, but never deallocating
 	if (genSpec.generated.CudaGPU.buffer != NULL)
 		gCudaRngSupport->m_gpu_memory = (void *)genSpec.generated.CudaGPU.buffer;	// restore the cudaGPU pointer to an already allocated buffer
 	float *randomFloatArray_GPU = (float *)gCudaRngSupport->m_gpu_memory;
-	if (freeCudaMemory == false) {
+	if (mustFreeCudaMemory == false) {
 		genSpec.generated.CudaGPU.buffer = (char *)gCudaRngSupport->m_gpu_memory;
 	}
 
@@ -193,7 +193,7 @@ int runLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, u
 				//printf("First CPU work item\n");
 				workCPU.WorkerType = ComputeEngine::CPU;
 				workCPU.AmountOfWork = NumOfRandomsInWorkQuanta;
-				workCPU.HostPtr = (char *)(&(randomFloatArray[resultArrayIndex_CPU]));
+				workCPU.HostResultPtr = (char *)(&(randomFloatArray[resultArrayIndex_CPU]));
 				//printf("Event set for work item for MultiCore CPU\n");
 				if (!SetEvent(ghEventHaveWorkItemForCpu))	// signal that CPU has a work item to work on
 				{
@@ -216,13 +216,13 @@ int runLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, u
 					//printf("First CudaGPU work item\n");
 					workCudaGPU.WorkerType   = ComputeEngine::CUDA_GPU;
 					workCudaGPU.AmountOfWork = NumOfRandomsInWorkQuanta;
-					workCudaGPU.DevicePtr    = (char *)(&(randomFloatArray_GPU[resultArrayIndex_GPU]));
+					workCudaGPU.DeviceResultPtr    = (char *)(&(randomFloatArray_GPU[resultArrayIndex_GPU]));
 					if (genSpec.resultDestination == ResultInSystemMemory && genSpec.CudaGPU.helpOthers) {
-						workCudaGPU.HostPtr = (char *)(&(randomFloatArray[resultArrayIndex_CPU]));
+						workCudaGPU.HostResultPtr = (char *)(&(randomFloatArray[resultArrayIndex_CPU]));
 						resultArrayIndex_CPU += NumOfRandomsInWorkQuanta;		// TODO: Figure out how to handle different size workQuanta between CPU and GPU and knowing when work is done
 					}
 					else {
-						workCudaGPU.HostPtr = NULL;
+						workCudaGPU.HostResultPtr = NULL;
 						resultArrayIndex_GPU += NumOfRandomsInWorkQuanta;
 					}
 					//printf("Cuda GPU work item: amountOfWork = %d at GPU memory address %p\n", workCudaGPU.amountOfWork, workCudaGPU.b_GPU);
@@ -265,7 +265,7 @@ int runLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, u
 					//printf("More CPU work item\n");
 					workCPU.WorkerType = ComputeEngine::CPU;
 					workCPU.AmountOfWork = NumOfRandomsInWorkQuanta;
-					workCPU.HostPtr = (char *)(&(randomFloatArray[resultArrayIndex_CPU]));
+					workCPU.HostResultPtr = (char *)(&(randomFloatArray[resultArrayIndex_CPU]));
 					if (!SetEvent(ghEventHaveWorkItemForCpu))	// Set one event to the signaled state
 					{
 						printf("SetEvent ghEventWorkForCpu failed (%d)\n", GetLastError());
@@ -288,12 +288,16 @@ int runLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, u
 							//printf("More CudaGPU work item\n");
 							workCudaGPU.WorkerType   = ComputeEngine::CUDA_GPU;
 							workCudaGPU.AmountOfWork = NumOfRandomsInWorkQuanta;
-							workCudaGPU.DevicePtr    = (char *)(&(randomFloatArray_GPU[resultArrayIndex_GPU]));
+							workCudaGPU.DeviceResultPtr    = (char *)(&(randomFloatArray_GPU[resultArrayIndex_GPU]));
 							//printf("resultArrayIndex_GPU = %zd\n", resultArrayIndex_GPU);
-							if (genSpec.resultDestination == ResultInSystemMemory && genSpec.CudaGPU.helpOthers)
-								workCudaGPU.HostPtr = (char *)(&(randomFloatArray[resultArrayIndex_CPU]));
-							else
-								workCudaGPU.HostPtr = NULL;
+							if (genSpec.resultDestination == ResultInSystemMemory && genSpec.CudaGPU.helpOthers) {
+								workCudaGPU.HostResultPtr = (char *)(&(randomFloatArray[resultArrayIndex_CPU]));
+								resultArrayIndex_CPU += NumOfRandomsInWorkQuanta;	// don't advance GPU index to reuse the same GPU array
+							}
+							else {
+								workCudaGPU.HostResultPtr = NULL;
+								resultArrayIndex_GPU += NumOfRandomsInWorkQuanta;
+							}
 							//printf("Created work items for CUDA GPU\n");
 							if (!SetEvent(ghEventHaveWorkItemForCudaGpu))	// Set one event to the signaled state
 							{
@@ -302,10 +306,6 @@ int runLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, u
 							}
 							inputWorkIndex++;
 							//printf("Gave new work item to GPU. resultArrayIndex = %zd. Completed %zd work items\n", resultArrayIndex_GPU, numGpuWorkItemsDone);
-							if (genSpec.resultDestination == ResultInSystemMemory && genSpec.CudaGPU.helpOthers)
-								resultArrayIndex_CPU += NumOfRandomsInWorkQuanta;	// don't advance GPU index to reuse the same GPU array
-							else
-								resultArrayIndex_GPU += NumOfRandomsInWorkQuanta;
 						}
 					}
 					else {

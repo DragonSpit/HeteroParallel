@@ -97,11 +97,11 @@ struct BufferResultMsg {
 	bool isLast;
 };
 
-typedef WorkType        gen_input_type;		// number of random floats to generate
+typedef WorkItemType        gen_input_type;		// number of random floats to generate
 typedef BufferResultMsg gen_output_type;	// TODO: needs to be output_type, since it's expected by gateway.try_put()
 
-typedef tbb::flow::async_node< WorkType, BufferResultMsg > async_cpu_rng_node;
-typedef tbb::flow::async_node< WorkType, BufferResultMsg > async_gpu_rng_node;
+typedef tbb::flow::async_node< WorkItemType, BufferResultMsg > async_cpu_rng_node;
+typedef tbb::flow::async_node< WorkItemType, BufferResultMsg > async_gpu_rng_node;
 //typedef tbb::flow::async_node< BufferMsg, tbb::flow::continue_msg > async_file_writer_node;
 
 class AsyncGenerateNodeActivity {
@@ -114,7 +114,7 @@ public:
 		gateway_type*  gateway;
 	};
 	// TODO: Turn this into a getter instead of making it public
-	CudaRngSupport *m_CudaRngSupport;
+	CudaRngEncapsulation *m_CudaRngSupport;
 	string   m_cudaTimestamps[200];	// hard array to avoid dynamic allocation of std::vector at unpredictable times
 	unsigned m_cudaTimestampsIndex;
 	string   m_cpuTimestamps[200];
@@ -133,7 +133,7 @@ public:
 			int argc = 0;
 			const char **argv = NULL;
 			m_CudaDeviceID = findCudaDevice(argc, (const char **)argv);	// TODO: need to do this operation only once
-			m_CudaRngSupport = new CudaRngSupport(prngSeed, cudaNumBytesToPreallocate, m_freeCudaMemory);
+			m_CudaRngSupport = new CudaRngEncapsulation(prngSeed, cudaNumBytesToPreallocate, m_freeCudaMemory);
 		}
 		printf("AsyncGenerateNodeActivity constructor has completed\n");
 	}
@@ -195,7 +195,7 @@ private:
 			int rngResult;
 			m_timer.reset();
 			m_timer.timeStamp();
-			rngResult = mklRandomFloatParallel_SkipAhead((float *)numRandFloats.HostPtr, numRandFloats.AmountOfWork, rngSeed, rngType, numCores);
+			rngResult = mklRandomFloatParallel_SkipAhead((float *)numRandFloats.HostResultPtr, numRandFloats.AmountOfWork, rngSeed, rngType, numCores);
 			m_timer.timeStamp();
 			std::stringstream outString;
 			outString << "doWork: mklRandomFloatParallel_SkipAhead " << m_timer.getCycleCount(1) << " took " << m_timer.getAverageDeltaInSeconds() << " seconds and ran at " << (size_t)((double)numRandFloats.AmountOfWork / m_timer.getAverageDeltaInSeconds()) << " floats/second" << endl;
@@ -214,7 +214,7 @@ private:
 			m_seqId++;
 			printf("Starting doWork() GPU: numOfRandFloats to generate is %zd of floats\n", numRandFloats.AmountOfWork);
 			bool verify = false;
-			GenerateRandFloatCuda((float *)numRandFloats.DevicePtr, (float *)numRandFloats.HostPtr, m_CudaRngSupport->prngGPU, numRandFloats.AmountOfWork, verify, m_CudaRngSupport->prngCPU);
+			GenerateRandFloatCuda((float *)numRandFloats.DeviceResultPtr, (float *)numRandFloats.HostResultPtr, m_CudaRngSupport->prngGPU, numRandFloats.AmountOfWork, verify, m_CudaRngSupport->prngCPU);
 			m_timer.timeStamp();
 			printf("doWork: GenerateRandFloatCuda took %f seconds and ran at %zd floats/second\n", m_timer.getAverageDeltaInSeconds(), (size_t)((double)numRandFloats.AmountOfWork / m_timer.getAverageDeltaInSeconds()));
 			std::stringstream outString;
@@ -241,11 +241,11 @@ private:
 
 // first element of the tuple is the worker type, the second is the amount of work to be performed
 // multifunction_node template takes an input and an output type
-typedef tbb::flow::multifunction_node<WorkType, tbb::flow::tuple<WorkType, WorkType>> select_worker_node;
+typedef tbb::flow::multifunction_node<WorkItemType, tbb::flow::tuple<WorkItemType, WorkItemType>> select_worker_node;
 
 struct SelectWorkerBody
 {
-	void operator()(const WorkType& work, select_worker_node::output_ports_type &op)
+	void operator()(const WorkItemType& work, select_worker_node::output_ports_type &op)
 	{
 		//printf("SelectorWorkerBody, selecting worker with workerType %d and amountOfWork %zd\n", work.workerType, work.amountOfWork);
 		if (work.WorkerType == 0) {
@@ -323,7 +323,7 @@ int RngHetero(RandomsToGenerate& genSpec, ofstream& benchmarkFile, unsigned numT
 	//printf("CudaGPU address = %p\n", (float *)asyncNodeActivityCPU.m_CudaRngSupport->m_gpu_memory);	// TODO: Figure out why this line crashes
 
 	//broadcast_node<int> input_who(g);
-	broadcast_node<WorkType> input_work(g);		// broadcast nodes allow inputs to be fed by external code
+	broadcast_node<WorkItemType> input_work(g);		// broadcast nodes allow inputs to be fed by external code
 	//join_node< tuple<int, int>, queueing > join(g);
 	select_worker_node selectWorker(g, unlimited, SelectWorkerBody());
 	queue_node<gen_output_type> cpu_result_queue(g);
@@ -365,7 +365,7 @@ int RngHetero(RandomsToGenerate& genSpec, ofstream& benchmarkFile, unsigned numT
 		timer.timeStamp();
 		// Start each worker in the graph, once the graph has been constructructed
 		// TODO: Need to handle less work than enough for each of the worker type (e.g. 1.5xWorkQuanta randoms, 0.2xWorkQuanta randoms, with two available workers)
-		WorkType work;
+		WorkItemType work;
 		size_t resultArrayIndex = 0;		// TODO: Chage the name to _CPU
 		size_t resultArrayIndex_GPU = 0;
 		size_t inputWorkIndex = 0;
@@ -375,7 +375,7 @@ int RngHetero(RandomsToGenerate& genSpec, ofstream& benchmarkFile, unsigned numT
 				(genSpec.resultDestination == ResultInCudaGpuMemory   && genSpec.CPU.helpOthers) ||
 				(genSpec.resultDestination == ResultInOpenclGpuMemory && genSpec.CPU.helpOthers)) {
 				//printf("First CPU work item\n");
-				work.SetWorkType(ComputeEngine::CPU, NumOfRandomsInWorkQuanta, (char *)(&(randomFloatArray[resultArrayIndex])), NULL);
+				work.SetGeneratorWorkType(ComputeEngine::CPU, NumOfRandomsInWorkQuanta, (char *)(&(randomFloatArray[resultArrayIndex])), NULL);
 				input_work.try_put(work);
 				resultArrayIndex += NumOfRandomsInWorkQuanta;
 				inputWorkIndex++;
@@ -390,13 +390,13 @@ int RngHetero(RandomsToGenerate& genSpec, ofstream& benchmarkFile, unsigned numT
 				(genSpec.resultDestination == ResultInEachDevicesMemory && !genSpec.CudaGPU.helpOthers)) {
 				if ((resultArrayIndex_GPU + NumOfRandomsInWorkQuanta) < genSpec.CudaGPU.maxRandoms) {
 					//printf("First CudaGPU work item\n");
-					work.SetWorkType(ComputeEngine::CUDA_GPU, NumOfRandomsInWorkQuanta, NULL, (char *)(&(randomFloatArray_GPU[resultArrayIndex_GPU])));
+					work.SetGeneratorWorkType(ComputeEngine::CUDA_GPU, NumOfRandomsInWorkQuanta, NULL, (char *)(&(randomFloatArray_GPU[resultArrayIndex_GPU])));
 					if (genSpec.resultDestination == ResultInSystemMemory && genSpec.CudaGPU.helpOthers) {
-						work.HostPtr = (char *)(&(randomFloatArray[resultArrayIndex]));
+						work.HostResultPtr = (char *)(&(randomFloatArray[resultArrayIndex]));
 						resultArrayIndex += NumOfRandomsInWorkQuanta;		// TODO: Figure out how to handle different size workQuanta between CPU and GPU and knowing when work is done
 					}
 					else {
-						work.HostPtr = NULL;
+						work.HostResultPtr = NULL;
 						resultArrayIndex_GPU += NumOfRandomsInWorkQuanta;
 					}
 					input_work.try_put(work);
@@ -432,7 +432,7 @@ int RngHetero(RandomsToGenerate& genSpec, ofstream& benchmarkFile, unsigned numT
 					if (inputWorkIndex < NumOfWorkItems)	// Create new work item for CPU
 					{
 						//printf("More CPU work item\n");
-						work.SetWorkType(ComputeEngine::CPU, NumOfRandomsInWorkQuanta, (char *)(&(randomFloatArray[resultArrayIndex])), NULL);
+						work.SetGeneratorWorkType(ComputeEngine::CPU, NumOfRandomsInWorkQuanta, (char *)(&(randomFloatArray[resultArrayIndex])), NULL);
 						input_work.try_put(work);
 						inputWorkIndex++;
 						//printf("Gave new work item to CPU. resultArrayIndex = %zd. Completed %zd work items\n", resultArrayIndex, workCompletedByCPU);
@@ -449,12 +449,12 @@ int RngHetero(RandomsToGenerate& genSpec, ofstream& benchmarkFile, unsigned numT
 							(genSpec.resultDestination == ResultInEachDevicesMemory && !genSpec.CudaGPU.helpOthers)) {
 							if ((resultArrayIndex_GPU + NumOfRandomsInWorkQuanta) < genSpec.CudaGPU.maxRandoms) {
 								//printf("More CudaGPU work item\n");
-								work.SetWorkType(ComputeEngine::CUDA_GPU, NumOfRandomsInWorkQuanta, NULL, (char *)(&(randomFloatArray_GPU[resultArrayIndex_GPU])));
+								work.SetGeneratorWorkType(ComputeEngine::CUDA_GPU, NumOfRandomsInWorkQuanta, NULL, (char *)(&(randomFloatArray_GPU[resultArrayIndex_GPU])));
 								//printf("resultArrayIndex_GPU = %zd\n", resultArrayIndex_GPU);
 								if (genSpec.resultDestination == ResultInSystemMemory && genSpec.CudaGPU.helpOthers)
-									work.HostPtr = (char *)(&(randomFloatArray[resultArrayIndex]));
+									work.HostResultPtr = (char *)(&(randomFloatArray[resultArrayIndex]));
 								else
-									work.HostPtr = NULL;
+									work.HostResultPtr = NULL;
 								input_work.try_put(work);
 								inputWorkIndex++;
 								printf("Gave new work item to GPU. resultArrayIndex = %zd. Completed %zd work items\n", resultArrayIndex_GPU, workCompletedByGPU);

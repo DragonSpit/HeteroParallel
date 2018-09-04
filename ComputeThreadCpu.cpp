@@ -19,7 +19,7 @@ extern int mklRandomFloatParallel_SkipAhead(float  * RngArray, size_t NumValues,
 extern HANDLE ghEventsComputeDone[NumComputeDoneEvents];
 extern bool gRunComputeWorkers;
 
-WorkType workCPU;				// work item for CPU to do. This is to be setup before ghEventHaveWorkItemForCpu gets set to notify the CPU thread to start working on it
+WorkItemType workCPU;				// work item for CPU to do. This is to be setup before ghEventHaveWorkItemForCpu gets set to notify the CPU thread to start working on it
 HANDLE ghEventHaveWorkItemForCpu;		// when asserted, work item for CPU is ready
 
 // Thread waits to receive a single event for work to be performed, does the work, and sets a compute-done event when that work has been completed
@@ -50,12 +50,12 @@ DWORD WINAPI ThreadMultiCoreCpuCompute(LPVOID lpParam)
 		unsigned int rngSeed = 2;
 		int rngType = VSL_BRNG_MCG59;
 		int numCores = 4;
-		int rngResult = mklRandomFloatParallel_SkipAhead((float *)workCPU.HostPtr, workCPU.AmountOfWork, rngSeed, rngType, numCores);
+		int rngResult = mklRandomFloatParallel_SkipAhead((float *)workCPU.HostResultPtr, workCPU.AmountOfWork, rngSeed, rngType, numCores);
 		// Signal the associated event to indicate work item has been finished
 		//printf("ThreadMultiCoreCpuCompute %d done with work item. Signaling dispatcher\n", GetCurrentThreadId());
 		if (!SetEvent(ghEventsComputeDone[ComputeEngine::CPU]))	// Set one event to the signaled state
 		{
-			printf("SetEvent[%zd] failed (%d)\n", ComputeEngine::CPU, GetLastError());
+			printf("SetEvent[%d] failed (%d)\n", ComputeEngine::CPU, GetLastError());
 			return 2;
 		}
 	}

@@ -11,23 +11,23 @@ extern void createCudaPrng(curandGenerator_t& prngGPU, unsigned long long seed, 
 extern void createCudaPrngHost(curandGenerator_t& prngGPU, unsigned long long seed, curandRngType_t rngAlgorithm);
 extern void freeCudaPrng(curandGenerator_t& prngGPU);
 
-class CudaRngSupport {
+class CudaRngEncapsulation {
 public:
-	CudaRngSupport(unsigned long long PrngSeed, size_t numBytesToPreallocate, bool freeCudaMemory) :
+	CudaRngEncapsulation(unsigned long long PrngSeed, size_t numBytesToPreallocate, bool freeCudaMemory) :
 		m_gpu_memory(NULL), rngAlgorithm(CURAND_RNG_PSEUDO_PHILOX4_32_10), m_freeCudaMemory(freeCudaMemory)
 	{
-		printf("CudaRngSupport constructor. Allocating %zd bytes of Cuda GPU memory. Creating RPNGs.\n", numBytesToPreallocate);
-		createCudaPrng(    prngGPU, PrngSeed, rngAlgorithm);
+		printf("CudaRngEncapsulation constructor. Allocating %zd bytes of Cuda GPU memory. Creating RPNGs.\n", numBytesToPreallocate);
+		createCudaPrng(    prngGPU, PrngSeed, rngAlgorithm);	// create PRNG on the CUDA device
 		createCudaPrngHost(prngCPU, PrngSeed, rngAlgorithm);	// for correctness verification
 
 		if (numBytesToPreallocate != 0)
 			m_gpu_memory = allocateCudaMemory(numBytesToPreallocate);
 		m_num_bytes = numBytesToPreallocate;
-		printf("CudaRngSupport: CUDA allocated memory %p number of bytes %zd\n", m_gpu_memory, m_num_bytes);
+		printf("CudaRngEncapsulation: CUDA allocated memory %p number of bytes %zd\n", m_gpu_memory, m_num_bytes);
 	}
 
-	~CudaRngSupport() {
-		//printf("CudaRngSupport destructor\n");
+	~CudaRngEncapsulation() {
+		//printf("CudaRngEncapsulation destructor\n");
 		freeCudaPrng(prngGPU);
 		freeCudaPrng(prngCPU);
 		//printf("Cuda memory pointer = %p\n", m_gpu_memory);

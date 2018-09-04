@@ -58,18 +58,20 @@ __int64 time_call(Function&& f)
 	return GetTickCount() - begin;
 }
 
-struct WorkType
+struct WorkItemType
 {
 	ComputeEngine WorkerType;	// what kind of worker this is
 	size_t AmountOfWork;
-	char*  HostPtr;				// host memory pointer
-	char*  DevicePtr;			// device memory pointer
+	char*  HostSourcePtr;		// host   memory pointer where the source data comes from
+	char*  HostResultPtr;		// host   memory pointer where the results will go
+	char*  DeviceSourcePtr;		// device memory pointer where the source data comes from
+	char*  DeviceResultPtr;		// device memory pointer where the results will go
 
-	void SetWorkType(ComputeEngine workerType, size_t amountOfWord, char* hostPtr, char* devicePtr)
+	void SetGeneratorWorkType(ComputeEngine workerType, size_t amountOfWord, char* hostResultPtr, char* deviceResultPtr = NULL)
 	{
 		workerType = workerType;
 		AmountOfWork = amountOfWord;
-		HostPtr = hostPtr;
-		DevicePtr = devicePtr;
+		HostResultPtr = hostResultPtr;
+		DeviceResultPtr = deviceResultPtr;
 	}
 };
