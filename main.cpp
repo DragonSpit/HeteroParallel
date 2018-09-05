@@ -173,10 +173,10 @@ int benchmarkGraph()
 	genSpec.CPU.helpOthers = false;
 	genSpec.CPU.prngSeed = std::time(0);
 	genSpec.CudaGPU.prngSeed = std::time(0) + 10;
-	genSpec.generated.CPU.buffer = NULL;		// NULL implies allocate memory. non-NULL implies reuse the buffer provided
-	genSpec.generated.CPU.numberOfRandoms = 0;
-	genSpec.generated.CudaGPU.buffer = NULL;	// NULL implies allocate memory. non-NULL implies reuse the buffer provided
-	genSpec.generated.CudaGPU.numberOfRandoms = 0;
+	genSpec.generated.CPU.Buffer = NULL;		// NULL implies allocate memory. non-NULL implies reuse the buffer provided
+	genSpec.generated.CPU.Length = 0;
+	genSpec.generated.CudaGPU.Buffer = NULL;	// NULL implies allocate memory. non-NULL implies reuse the buffer provided
+	genSpec.generated.CudaGPU.Length = 0;
 	//printf("genSpec set\n");
 
 // TODO: Run multiple times (e.g. 1K times) for each size of array, and show performance of each time
@@ -217,10 +217,10 @@ int benchmarkGraph()
 		});
 		printf("GenerateHetero ran at an overall rate of %zd floats/second\n", (size_t)((double)genSpec.randomsToGenerate / (elapsed / 1000.0)));
 	}
-	delete[] genSpec.generated.CPU.buffer;
+	delete[] genSpec.generated.CPU.Buffer;
 	if ((genSpec.resultDestination == ResultInEachDevicesMemory && !genSpec.CudaGPU.helpOthers) ||
 		 genSpec.resultDestination == ResultInCudaGpuMemory)
-		freeCudaMemory(genSpec.generated.CudaGPU.buffer);
+		freeCudaMemory(genSpec.generated.CudaGPU.Buffer);
 
 	benchmarkFile.close();
 

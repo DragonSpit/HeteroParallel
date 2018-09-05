@@ -3,17 +3,16 @@
 #include <fstream>
 #include <ctime>
 
-// TODO: use the generic buffer type here with a pointer and length, since this has nothing to do with randoms
-struct RandomsGenSpec
+struct BufferType
 {
-	char*  buffer;				// pointer to generated randoms in memory of a computational unit
-	size_t numberOfRandoms;
+	char*  Buffer;	// pointer to the generated results in the memory of the particular computational unit
+	size_t Length;
 };
 
 struct RandomsGenerated
 {
-	RandomsGenSpec CPU;			// spec for generated randoms in CPU/system memory
-	RandomsGenSpec CudaGPU;		// spec for generated randoms in graphics/GPU memory
+	BufferType CPU;			// spec for generated randoms in CPU/system memory
+	BufferType CudaGPU;		// spec for generated randoms in graphics/GPU memory
 };
 
 enum ComputeEngine {

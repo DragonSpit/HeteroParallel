@@ -270,16 +270,16 @@ int RngHetero(RandomsToGenerate& genSpec, ofstream& benchmarkFile, unsigned numT
 	size_t NumOfBytesForRandomArray = NumOfRandomsInWorkQuanta * sizeof(float);	// TODO: Need to change to NumOfRandomsToGenerate, and not be a hack of a single work item's worth of memory
 
 	float * randomFloatArray = NULL;
-	if (genSpec.generated.CPU.buffer == NULL) {		// allocate only if haven't allocated yet
+	if (genSpec.generated.CPU.Buffer == NULL) {		// allocate only if haven't allocated yet
 		printf("Before allocation of NumOfBytesForRandomArray = %zd\n", NumOfRandomsToGenerate * sizeof(float));
 		randomFloatArray = new float[NumOfRandomsToGenerate];
 		// Clearing the arrays also pages them in (warming them up), which improves performance by 3X for the first generator due to first use
 		// TODO: reading one byte from each page may be a faster way to warm up (page in) the array. I already have code for this.
 		memset((void *)randomFloatArray, 0, NumOfRandomsToGenerate * sizeof(float));
-		genSpec.generated.CPU.buffer = (char *)randomFloatArray;
+		genSpec.generated.CPU.Buffer = (char *)randomFloatArray;
 	}
 	else {
-		randomFloatArray = (float *)genSpec.generated.CPU.buffer;
+		randomFloatArray = (float *)genSpec.generated.CPU.Buffer;
 	}
 	// TODO: Need to set the number of randoms generated in CPU memory and GPU memory at the end of all generation once it's known
 	// TODO: Only allocate system memory when we are going to put randoms into it
@@ -309,15 +309,15 @@ int RngHetero(RandomsToGenerate& genSpec, ofstream& benchmarkFile, unsigned numT
 	bool freeCudaMemory = ((genSpec.resultDestination == ResultInEachDevicesMemory && !genSpec.CudaGPU.helpOthers) || (genSpec.resultDestination == ResultInCudaGpuMemory))
 		? false : true;
 	// TODO: This is really hacky! We need a way to set the cudaBuffer memory pointer inside AsyncGenerateNodeActivity class in a much cleaner way, possibly in constructor
-	if (genSpec.generated.CudaGPU.buffer != NULL)
+	if (genSpec.generated.CudaGPU.Buffer != NULL)
 		preallocateGPUmemorySize = 0;
 	AsyncGenerateNodeActivity asyncNodeActivityGPU(AsyncGenerateNodeActivity::CudaGPU, preallocateGPUmemorySize, freeCudaMemory, genSpec.CudaGPU.prngSeed);	// pre-allocate GPU memory, since it takes forever to allocate
 	// TODO: This is really hacky! We need a way to set the cudaBuffer memory pointer inside AsyncGenerateNodeActivity class in a much cleaner way, possibly in constructor
-	if (genSpec.generated.CudaGPU.buffer != NULL)
-		asyncNodeActivityGPU.m_CudaRngSupport->m_gpu_memory = (void *)genSpec.generated.CudaGPU.buffer;	// restore the cudaGPU pointer to an already allocated buffer
+	if (genSpec.generated.CudaGPU.Buffer != NULL)
+		asyncNodeActivityGPU.m_CudaRngSupport->m_gpu_memory = (void *)genSpec.generated.CudaGPU.Buffer;	// restore the cudaGPU pointer to an already allocated buffer
 	float *randomFloatArray_GPU = (float *)asyncNodeActivityGPU.m_CudaRngSupport->m_gpu_memory;
 	if (freeCudaMemory == false) {
-		genSpec.generated.CudaGPU.buffer = (char *)asyncNodeActivityGPU.m_CudaRngSupport->m_gpu_memory;
+		genSpec.generated.CudaGPU.Buffer = (char *)asyncNodeActivityGPU.m_CudaRngSupport->m_gpu_memory;
 	}
 
 	//printf("CudaGPU address = %p\n", (float *)asyncNodeActivityCPU.m_CudaRngSupport->m_gpu_memory);	// TODO: Figure out why this line crashes
@@ -527,10 +527,10 @@ int RngHetero(RandomsToGenerate& genSpec, ofstream& benchmarkFile, unsigned numT
 		average /= totalRandomsGenerated;
 		printf("Mean = %f of %zd random values. Random array size is %zd\n", average, totalRandomsGenerated, genSpec.randomsToGenerate);
 
-		genSpec.generated.CPU.buffer = (char *)randomFloatArray;
-		genSpec.generated.CPU.numberOfRandoms = resultArrayIndex;
-		genSpec.generated.CudaGPU.buffer = (char *)randomFloatArray_GPU;
-		genSpec.generated.CudaGPU.numberOfRandoms = resultArrayIndex_GPU;
+		genSpec.generated.CPU.Buffer = (char *)randomFloatArray;
+		genSpec.generated.CPU.Length = resultArrayIndex;
+		genSpec.generated.CudaGPU.Buffer = (char *)randomFloatArray_GPU;
+		genSpec.generated.CudaGPU.Length = resultArrayIndex_GPU;
 		//printf("Done with fgHeteroAsyncNode\n");
 	}
 #if 0
@@ -618,7 +618,7 @@ int GenerateHetero(RandomsToGenerate& genSpec, ofstream& benchmarkFile, unsigned
 		// TODO: Need to return an address, number of randoms returned and the size of memory allocated.
 		// TODO: Need to NOT free that memory and make it the responsibility of the user, but provide an interface to de-allocate thru for each device.
 		RngHetero(genSpec, benchmarkFile, NumTimes);
-		genSpec.generated.CPU.numberOfRandoms = 0;
+		genSpec.generated.CPU.Length = 0;
 	}
 	else if (genSpec.resultDestination == ResultInSystemMemory)
 	{
@@ -629,8 +629,8 @@ int GenerateHetero(RandomsToGenerate& genSpec, ofstream& benchmarkFile, unsigned
 			return -3;		// TODO: Define error return codes in the .h file we provide to the users
 
 		RngHetero(genSpec, benchmarkFile, NumTimes);
-		genSpec.generated.CudaGPU.buffer = NULL;
-		genSpec.generated.CudaGPU.numberOfRandoms = 0;
+		genSpec.generated.CudaGPU.Buffer = NULL;
+		genSpec.generated.CudaGPU.Length = 0;
 	}
 	return 0;
 }
