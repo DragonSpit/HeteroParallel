@@ -24,7 +24,8 @@ extern HANDLE ghEventHaveWorkItemForCudaGpu;	// when asserted, work item for Cud
 extern DWORD WINAPI ThreadMultiCoreCpuCompute(LPVOID);
 extern DWORD WINAPI ThreadCudaGpuCompute(LPVOID);
 
-extern CudaRngEncapsulation * gCudaRngSupport;	// TODO: Make sure to deallocate it once done
+extern CudaRngEncapsulation    * gCudaRngSupport;		// TODO: Make sure to delete it once done
+extern CudaMemoryEncapsulation * gCudaMemorySupport;	// TODO: Make sure to delete it once done
 
 HANDLE ghEventsComputeDone[NumComputeDoneEvents];	// 0 - CPU, 1 - CudaGpu, 2 - OpenClGpu, 3 - OpenClFpga
 bool gRunComputeWorkers = true;
@@ -151,7 +152,6 @@ int runLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, u
 	printf("Allocating CudaGPU memory of %zd bytes\n", preallocateGPUmemorySize);
 
 	// TODO: Something is wrong in the following section with memory allocation. Plus, gCudaRngSupport is never deleted!
-	unsigned long long prngSeed = 2;
 	bool mustFreeCudaMemory = ((genSpec.resultDestination == ResultInEachDevicesMemory && !genSpec.CudaGPU.helpOthers) ||
 		(genSpec.resultDestination == ResultInCudaGpuMemory))
 		? false : true;
@@ -159,14 +159,14 @@ int runLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, u
 		preallocateGPUmemorySize = 0;
 
 	// CUDA memory allocation is extremely slow (seconds)!
-	gCudaRngSupport = new CudaRngEncapsulation(prngSeed, preallocateGPUmemorySize, mustFreeCudaMemory);
+	gCudaMemorySupport = new CudaMemoryEncapsulation(preallocateGPUmemorySize);
 	// TODO: This is really hacky! We need a way to set the cudaBuffer memory pointer inside AsyncGenerateNodeActivity class in a much cleaner way, possibly in constructor
 	// TODO: This is really hacky to support running across multiple loops, calling this method several times, doing "new CudaRngEncapsulation" in each loop, but never deallocating
 	if (genSpec.generated.CudaGPU.Buffer != NULL)
-		gCudaRngSupport->m_gpu_memory = (void *)genSpec.generated.CudaGPU.Buffer;	// restore the cudaGPU pointer to an already allocated buffer
-	float *randomFloatArray_GPU = (float *)gCudaRngSupport->m_gpu_memory;
+		gCudaMemorySupport->m_gpu_memory = (void *)genSpec.generated.CudaGPU.Buffer;	// restore the cudaGPU pointer to an already allocated buffer
+	float *randomFloatArray_GPU = (float *)gCudaMemorySupport->m_gpu_memory;
 	if (mustFreeCudaMemory == false) {
-		genSpec.generated.CudaGPU.Buffer = (char *)gCudaRngSupport->m_gpu_memory;
+		genSpec.generated.CudaGPU.Buffer = (char *)gCudaMemorySupport->m_gpu_memory;
 	}
 
 	// At this point CPU and GPU memory has been allocated
@@ -465,6 +465,9 @@ int benchmarkLoadBalancer()
 	const char **argv = NULL;
 	int m_CudaDeviceID = findCudaDevice(argc, (const char **)argv);	// TODO: need to do this operation only once
 
+	unsigned long long prngSeed = 2;
+	gCudaRngSupport = new CudaRngEncapsulation(prngSeed);
+
 	bool copyGPUresultsToSystemMemory = false;
 	RandomsToGenerate genSpec;
 
@@ -535,7 +538,7 @@ int benchmarkLoadBalancer()
 		auto elapsed = time_call([&] {
 			runLoadBalancerThreadPre(genSpec, benchmarkFile, NumTimes);
 		});
-		printf("GenerateHetero ran at an overall rate of %zd floats/second\n", (size_t)((double)genSpec.randomsToGenerate / (elapsed / 1000.0)));
+		printf("runLoadBalancerThreadPre ran at an overall rate of %zd floats/second\n", (size_t)((double)genSpec.randomsToGenerate / (elapsed / 1000.0)));
 	}
 	delete[] genSpec.generated.CPU.Buffer;
 	if ((genSpec.resultDestination == ResultInEachDevicesMemory && !genSpec.CudaGPU.helpOthers) ||

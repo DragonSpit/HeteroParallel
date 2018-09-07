@@ -110,7 +110,6 @@
     <ClCompile Include="..\..\Intel\tbb2017_20160722oss_win\tbb2017_20160722oss\examples\graph\fgbzip2\crctable.cpp" />
     <ClCompile Include="ArrayFire.cpp" />
     <ClCompile Include="asyncNodeExample.cpp" />
-    <ClCompile Include="asyncNodeGenerate.cpp" />
     <ClCompile Include="clRngExample.cpp" />
     <ClCompile Include="ComputeThreadCpu.cpp" />
     <ClCompile Include="ComputeThreadCudaGpu.cpp" />
