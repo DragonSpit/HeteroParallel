@@ -64,9 +64,9 @@ extern int tbbAsyncNodeExample();
 extern int tbbGraphExample();
 extern int tbb_join_node_example();
 extern void runHeteroRandomGenerator();
-extern void RngHetero(size_t numRandomsToGenerate, size_t workChunkSize, bool copyGPUresultsToSystemMemory);
+//extern void RngHetero(size_t numRandomsToGenerate, size_t workChunkSize, bool copyGPUresultsToSystemMemory);
 extern void broadcastNodeExample();
-extern int asyncNodeExample();
+//extern int asyncNodeExample();
 extern int indexerNodeExample();
 extern int indexerNodeExampleWithOutputAndQueue();
 extern int mainThread(void);
@@ -146,8 +146,6 @@ extern "C" bool runTest(const int argc, const char **argv,
 int
 wmain(int argc, char **argv)
 {
-	//benchmarkGraph();
-
 	//mainThread();
 	benchmarkLoadBalancer();	// CPU and Cuda GPU RNG
 	//myMainSort(argc, argv);
