@@ -30,7 +30,7 @@ extern CudaMemoryEncapsulation * gCudaMemorySupport;	// TODO: Make sure to delet
 HANDLE ghEventsComputeDone[NumComputeDoneEvents];	// 0 - CPU, 1 - CudaGpu, 2 - OpenClGpu, 3 - OpenClFpga
 bool gRunComputeWorkers = true;
 
-int loadBalancerInit(void)
+int loadBalancerCreateEventsAndThreads(void)
 {
 	HANDLE hThread;
 	DWORD i, dwThreadID;
@@ -108,7 +108,7 @@ int loadBalancerInit(void)
 
 	return 0;
 }
-int loadBalancerShutdown(void)
+int loadBalancerDestroyEventsAndThreads(void)
 {
 	// TODO: Shut down all compute threads and wait for them to be done
 	gRunComputeWorkers = false;
@@ -346,35 +346,18 @@ int runLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, u
 // memory, this is 1/2 of what my system has, even if you have 32 GB of system memory, 8 GB of graphics memory is substantial percentage of overall memory.
 // Step #1: Let's just put the best benchmarks out of my blog and website and go from there.
 // Step #2: Work on other output options, such a single array in any memory, and an array of workItems in shared memory (i.e. no copy, but less convenient to use)
-int runLoadBalancerThreadPre(RandomsToGenerate& genSpec, ofstream& benchmarkFile, unsigned NumTimes)
+int SelectAndRunLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, unsigned NumTimes)
 {
-	loadBalancerInit();
-
-	if (genSpec.CPU.memoryCapacity < (genSpec.CPU.maxRandoms * sizeof(float))) {
-		printf("Error: Maximum number of randoms for CPU memory exceeds memory capacity.\n");
-		return -1;
-	}
-	if (genSpec.CudaGPU.memoryCapacity < (genSpec.CudaGPU.maxRandoms * sizeof(float))) {
-		printf("Error: Maximum number of randoms for GPU memory exceeds memory capacity.\n");
-		return -2;
-	}
-	if (genSpec.CPU.workQuanta == 0)
-		genSpec.CPU.workQuanta = 20 * 1024 * 1024;	// TODO: Need to define a global constant for this
-	if (genSpec.CudaGPU.workQuanta == 0)
-		genSpec.CudaGPU.workQuanta = 20 * 1024 * 1024;	// TODO: Need to define a global constant for this
-														// TODO: Develop a way to determine optimal work chunk size, possibly dynamically or during install on that machine, or over many runs get to better and better performance
-	printf("NumOfRandomsToGenerate = %zd, CPU.workQuanta = %zd, GPU.workQuanta = %zd\n", genSpec.randomsToGenerate, genSpec.CPU.workQuanta, genSpec.CudaGPU.workQuanta);
-
 	if (genSpec.resultDestination == ResultInEachDevicesMemory)
 	{
-		printf("runLoadBalancerThreadPre with ResultInEachDevicesMemory\n");
+		printf("SelectAndRunLoadBalancerThread with ResultInEachDevicesMemory\n");
 		// TODO: Need to return an address, number of randoms returned and the size of memory allocated.
 		// TODO: Need to NOT free that memory and make it the responsibility of the user, but provide an interface to de-allocate thru for each device.
 		return runLoadBalancerThread(genSpec, benchmarkFile, NumTimes);
 	}
 	else if (genSpec.resultDestination == ResultInCudaGpuMemory)
 	{
-		printf("runLoadBalancerThreadPre with ResultInCudaGPUMemory\n");
+		printf("SelectAndRunLoadBalancerThread with ResultInCudaGPUMemory\n");
 		// TODO: Need to return an address, number of randoms returned and the size of memory allocated.
 		// TODO: Need to NOT free that memory and make it the responsibility of the user, but provide an interface to de-allocate thru for each device.
 		runLoadBalancerThread(genSpec, benchmarkFile, NumTimes);
@@ -393,7 +376,71 @@ int runLoadBalancerThreadPre(RandomsToGenerate& genSpec, ofstream& benchmarkFile
 		genSpec.generated.CudaGPU.Length = 0;
 	}
 
-	loadBalancerShutdown();
+	return 0;
+}
+
+void MemoryAllocatorCpu_GenRng(RandomsToGenerate& genSpec)
+{
+	// Determine how much CPU memory to allocate.
+	// TODO: We should only allocate as much CPU/System memory as will be actually used (as not all result may go into system memory)
+	// TODO: Only allocate system memory when we are going to put randoms into it
+	// TODO: Create CpuMemoryEncapsulation class, just like there is one for the GPU
+	if (genSpec.generated.CPU.Buffer == NULL) {
+		printf("Before allocation of NumOfBytesForRandomArray = %zd\n", genSpec.randomsToGenerate * sizeof(float));
+		float * randomFloatArray = new float[genSpec.randomsToGenerate];
+		// Clearing the arrays also pages them in (warming them up), which improves performance by 3X for the first generator due to first use
+		// TODO: reading one byte from each page is a faster way to warm up (page in) the array. I already have code for this.
+		memset((void *)randomFloatArray, 0, genSpec.randomsToGenerate * sizeof(float));
+		genSpec.generated.CPU.Buffer = (char *)randomFloatArray;
+	}
+	printf("After allocation of NumOfBytesForRandomArray = %zd at CPU memory location = %p\n", genSpec.randomsToGenerate * sizeof(float), genSpec.generated.CPU.Buffer);
+
+	if (genSpec.CPU.workQuanta == 0)
+		genSpec.CPU.workQuanta = 20 * 1024 * 1024;	// TODO: Need to define a global constant for this
+
+	printf("NumOfRandomsToGenerate = %zd, CPU.workQuanta = %zd\n", genSpec.randomsToGenerate, genSpec.CPU.workQuanta);
+}
+
+int MemoryAllocatorGpu_GenRng(RandomsToGenerate& genSpec)
+{
+	// Determine how much GPU memory to allocate
+	size_t NumOfRandomsInWorkQuanta = genSpec.CPU.workQuanta;		// TODO: Need to separate CPU and GPU workQuanta, and handle them being different
+																	// TODO: Fix the problem with the case of asking the CudaGPU to generate more randoms that can fit into it's memory, but no other computational units are helping to generate more
+																	// TODO: One possible way to do this is to pre-determine the NumOfWorkItems and shrink it in case there is not enough memory between all of the generators
+																	// TODO: Another way is to create a method that takes genSpec as input and outputs all of the needed setup variables with their values for the rest of the code to use
+	size_t preallocateGPUmemorySize;
+	if (genSpec.resultDestination == ResultInSystemMemory && genSpec.CudaGPU.helpOthers)
+		preallocateGPUmemorySize = NumOfRandomsInWorkQuanta * sizeof(float);	// since GPU is a helper, only pre-allocate workQuanta size in GPU memory and use the same memory buffer for each work item
+	else if (genSpec.resultDestination == ResultInSystemMemory && !genSpec.CudaGPU.helpOthers)
+		preallocateGPUmemorySize = 0;
+	else if ((genSpec.resultDestination == ResultInEachDevicesMemory && !genSpec.CudaGPU.helpOthers) || (genSpec.resultDestination == ResultInCudaGpuMemory))
+		preallocateGPUmemorySize = genSpec.CudaGPU.maxRandoms * sizeof(float);
+	else {
+		printf("Error: Unsupported configuration\n");
+		return -1;
+	}
+	printf("Allocating CudaGPU memory of %zd bytes\n", preallocateGPUmemorySize);
+
+	// CUDA memory allocation is extremely slow (seconds)!
+	gCudaMemorySupport = new CudaMemoryEncapsulation(preallocateGPUmemorySize);
+
+	if (genSpec.CudaGPU.workQuanta == 0)
+		genSpec.CudaGPU.workQuanta = 20 * 1024 * 1024;	// TODO: Need to define a global constant for this
+														// TODO: Develop a way to determine optimal work chunk size, possibly dynamically or during install on that machine, or over many runs get to better and better performance
+	printf("NumOfRandomsToGenerate = %zd, GPU.workQuanta = %zd\n", genSpec.randomsToGenerate, genSpec.CudaGPU.workQuanta);
+	return 0;
+}
+
+int Validator(RandomsToGenerate& genSpec)
+{
+	if (genSpec.CPU.memoryCapacity < (genSpec.CPU.maxRandoms * sizeof(float))) {
+		printf("Error: Maximum number of randoms for CPU memory exceeds memory capacity.\n");
+		return -1;
+	}
+	if (genSpec.CudaGPU.memoryCapacity < (genSpec.CudaGPU.maxRandoms * sizeof(float))) {
+		printf("Error: Maximum number of randoms for GPU memory exceeds memory capacity.\n");
+		return -2;
+	}
 
 	return 0;
 }
@@ -450,47 +497,22 @@ int benchmarkLoadBalancer()
 	genSpec.CudaGPU.helpOthers = false;
 	genSpec.CudaGPU.prngSeed = std::time(0) + 10;
 
-	genSpec.generated.CPU.Buffer = NULL;		// NULL implies allocate memory. non-NULL implies reuse the buffer provided
+	genSpec.generated.CPU.Buffer = NULL;		// NULL implies the generator is to allocate memory. non-NULL implies reuse the buffer provided
 	genSpec.generated.CPU.Length = 0;
-	genSpec.generated.CudaGPU.Buffer = NULL;	// NULL implies allocate memory. non-NULL implies reuse the buffer provided
+	genSpec.generated.CudaGPU.Buffer = NULL;	// NULL implies the generator is to allocate memory. non-NULL implies reuse the buffer provided
 	genSpec.generated.CudaGPU.Length = 0;
 	printf("genSpec set\n");
 
-	// Determine how much CPU memory to allocate.
-	// TODO: We should only allocate as much CPU/System memory as will be actually used (as not all result may go into system memory)
-	// TODO: Create CpuMemoryEncapsulation class, just like there is one for the GPU
-	if (genSpec.generated.CPU.Buffer == NULL) {		// allocate only if haven't allocated yet
-		printf("Before allocation of NumOfBytesForRandomArray = %zd\n", genSpec.randomsToGenerate * sizeof(float));
-		float * randomFloatArray = new float[genSpec.randomsToGenerate];
-		// Clearing the arrays also pages them in (warming them up), which improves performance by 3X for the first generator due to first use
-		// TODO: reading one byte from each page is a faster way to warm up (page in) the array. I already have code for this.
-		memset((void *)randomFloatArray, 0, genSpec.randomsToGenerate * sizeof(float));
-		genSpec.generated.CPU.Buffer = (char *)randomFloatArray;
-	}
-	// TODO: Need to set the number of randoms generated in CPU memory and GPU memory at the end of all generation once it's known
-	// TODO: Only allocate system memory when we are going to put randoms into it
-	printf("After allocation of NumOfBytesForRandomArray = %zd at CPU memory location = %p\n", genSpec.randomsToGenerate * sizeof(float), genSpec.generated.CPU.Buffer);
-
-	// Determine how much GPU memory to allocate
-	size_t NumOfRandomsInWorkQuanta = genSpec.CPU.workQuanta;		// TODO: Need to separate CPU and GPU workQuanta, and handle them being different
-																	// TODO: Fix the problem with the case of asking the CudaGPU to generate more randoms that can fit into it's memory, but no other computational units are helping to generate more
-																	// TODO: One possible way to do this is to pre-determine the NumOfWorkItems and shrink it in case there is not enough memory between all of the generators
-																	// TODO: Another way is to create a method that takes genSpec as input and outputs all of the needed setup variables with their values for the rest of the code to use
-	size_t preallocateGPUmemorySize;
-	if (genSpec.resultDestination == ResultInSystemMemory && genSpec.CudaGPU.helpOthers)
-		preallocateGPUmemorySize = NumOfRandomsInWorkQuanta * sizeof(float);	// since GPU is a helper, only pre-allocate workQuanta size in GPU memory and use the same memory buffer for each work item
-	else if (genSpec.resultDestination == ResultInSystemMemory && !genSpec.CudaGPU.helpOthers)
-		preallocateGPUmemorySize = 0;
-	else if ((genSpec.resultDestination == ResultInEachDevicesMemory && !genSpec.CudaGPU.helpOthers) ||
-		(genSpec.resultDestination == ResultInCudaGpuMemory))
-		preallocateGPUmemorySize = genSpec.CudaGPU.maxRandoms * sizeof(float);
-	else {
-		printf("Error: Unsupported configuration\n");
+	if (Validator(genSpec) != 0)
 		return -1;
-	}
-	printf("Allocating CudaGPU memory of %zd bytes\n", preallocateGPUmemorySize);
-	// CUDA memory allocation is extremely slow (seconds)!
-	gCudaMemorySupport = new CudaMemoryEncapsulation(preallocateGPUmemorySize);
+
+	MemoryAllocatorCpu_GenRng(genSpec);
+
+	MemoryAllocatorGpu_GenRng(genSpec);
+
+	loadBalancerCreateEventsAndThreads();
+
+	// TODO: Need to set the number of randoms generated in CPU memory and GPU memory at the end of all generation once it's known
 
 	// TODO: Run multiple times (e.g. 1K times) for each size of array, and show performance of each time
 	// TODO: Run over all cudaRand type of generators to provide performance numbers for all of them
@@ -526,10 +548,12 @@ int benchmarkLoadBalancer()
 		// TODO: Create a UWP application service for high performance and accelerated algorithms, providing LSD Radix Sort, CudaRand algorithms, MKL algorithms, to make them available to C# and other UWP applications. Sadly, transfer of data runs at about 30MBytes/sec, which is way too slow. In-process UWP application service should perform well enough
 
 		auto elapsed = time_call([&] {
-			runLoadBalancerThreadPre(genSpec, benchmarkFile, NumTimes);
+			SelectAndRunLoadBalancerThread(genSpec, benchmarkFile, NumTimes);
 		});
-		printf("runLoadBalancerThreadPre ran at an overall rate of %zd floats/second\n", (size_t)((double)genSpec.randomsToGenerate / (elapsed / 1000.0)));
+		printf("SelectAndRunLoadBalancerThread ran at an overall rate of %zd floats/second\n", (size_t)((double)genSpec.randomsToGenerate / (elapsed / 1000.0)));
 	}
+
+	loadBalancerDestroyEventsAndThreads();
 
 	delete[] genSpec.generated.CPU.Buffer;
 	delete gCudaMemorySupport;
