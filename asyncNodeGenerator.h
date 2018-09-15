@@ -22,7 +22,7 @@ enum ComputeEngine {
 const size_t NumComputeDoneEvents = 4;
 
 enum ResultDestination {
-	ResultInEachDevicesMemory = 0, ResultInSystemMemory, ResultInCudaGpuMemory, ResultInOpenclGpuMemory, ResultInFpgaMemory
+	ResultInEachDevicesMemory = 0, ResultInCpuMemory, ResultInCudaGpuMemory, ResultInOpenclGpuMemory, ResultInFpgaMemory
 };
 
 // TODO: In the future, the user could specify 0 for each capacity and we discover it for them, but to start with we'll put the burden on the user
@@ -32,7 +32,7 @@ struct RandomsControlSpec
 	size_t memoryCapacity;	// size of available memory in bytes
 	size_t maxRandoms;		// up to this number of randoms to generate in memory (must divide evenly by workQuanta)
 	size_t workQuanta;      // work quanta that will be done at a time (smaller is less efficient, but better load balance)
-	bool   helpOthers;		// true => allowed to help other computational units with their work
+	bool   allowedToWork;	// true => allowed to do the work
 	unsigned long long prngSeed;
 };
 
@@ -42,6 +42,8 @@ struct RandomsToGenerate
 	size_t randomsToGenerate;	// total number of randoms to generate, possibly spread out across memories within various computational units, depending on speed of each RNG and memory capacity of each computational unit
 	RandomsControlSpec CPU;
 	RandomsControlSpec CudaGPU;
+	RandomsControlSpec OpenclGPU;
+	RandomsControlSpec FpgaGPU;
 	RandomsGenerated   generated;
 };
 
