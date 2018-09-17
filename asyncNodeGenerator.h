@@ -32,6 +32,8 @@ struct RandomsControlSpec
 	size_t memoryCapacity;	// size of available memory in bytes
 	size_t maxRandoms;		// up to this number of randoms to generate in memory (must divide evenly by workQuanta)
 	size_t workQuanta;      // work quanta that will be done at a time (smaller is less efficient, but better load balance)
+	size_t sizeOfItem;		// size of each data type item to be generated in bytes
+	size_t itemsAllocated;	// number of items, each one of sizeOfItem, that have been allocated
 	bool   allowedToWork;	// true => allowed to do the work
 	unsigned long long prngSeed;
 };

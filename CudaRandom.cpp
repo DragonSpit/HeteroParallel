@@ -83,7 +83,9 @@ void *allocateCudaMemory(size_t numBytes)
 	printf("Before CUDA memory allocation of %zd bytes\n", numBytes);
 	checkCudaErrors(cudaMalloc((void **)&devMemPtr, numBytes));		// allocate in Cuda memory
 	//checkCudaErrors(cudaMallocManaged((void **)&devMemPtr, numBytes));	// allocate in shared/managed memory
-	//checkCudaErrors(cudaMallocHost((void **)&devMemPtr, numBytes));	// allocate in host memory (free'ing failed for some reason)
+	//memset((void *)devMemPtr, 0, numBytes);		// page system memory in for faster first use
+	//checkCudaErrors(cudaMallocHost((void **)&devMemPtr, numBytes));	// allocate in host memory (free'ing failed for some reason, after several allocations)
+	//checkCudaErrors(cudaHostAlloc((void **)&devMemPtr, numBytes, cudaHostAllocDefault));	// allocate in host memory, works better than cudaMallocHost, but needs a matching cudaFreeHost
 	if (!devMemPtr)
 		printf("CUDA error: couldn't allocate CUDA memory\n");
 	//printf("After allocation of CUDA memory\n");
@@ -95,6 +97,7 @@ int freeCudaMemory(void * devMemPtr)
 {
 	printf("CUDA memory free %p\n", devMemPtr);
 	checkCudaErrors(cudaFree(devMemPtr));
+	//checkCudaErrors(cudaFreeHost(devMemPtr));		// matches cudaHostAlloc
 	return 0;
 }
 

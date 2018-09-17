@@ -48,8 +48,8 @@ DWORD WINAPI ThreadMultiCoreCpuCompute(LPVOID lpParam)
 
 		// TODO: Do the CPU work requested in the work item
 		unsigned int rngSeed = 2;
-		int rngType = VSL_BRNG_MCG59;
-		int numCores = 4;
+		int rngType = VSL_BRNG_PHILOX4X32X10;	// was VSL_BRNG_MCG59, which doesn't scale as well, seeming to have memory contension past 2 cores
+		int numCores = 1;
 		int rngResult = mklRandomFloatParallel_SkipAhead((float *)workCPU.HostResultPtr, workCPU.AmountOfWork, rngSeed, rngType, numCores);
 		// Signal the associated event to indicate work item has been finished
 		//printf("ThreadMultiCoreCpuCompute %d done with work item. Signaling dispatcher\n", GetCurrentThreadId());
