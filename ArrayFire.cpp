@@ -10,10 +10,11 @@ array unsortedRandomArrayU32;
 array sortedArrayU32;
 array indexes;
 
-void generateRandomArray()
+void generateRandomFloatArray(array& randomArrayFloat, size_t numRandoms, float* hostDestArray)
 {
-	// Generate a random unsigned array
-	array randomArrayU32 = randu(numRandoms, f32);
+	randomArrayFloat = randu(numRandoms, f32);
+	af::sync();
+	randomArrayFloat.host((void *)hostDestArray);
 	af::sync();
 }
 
@@ -68,11 +69,14 @@ int ArrayFireTest(int device)
 		af::setDevice(device);
 		af::info();
 
+		array randomArrayFloat(numRandoms);
+		float * hostArrayFloat = new float[numRandoms];
+
 		timer.reset();
 		timer.timeStamp();
 
 		//std::cout << "Generate array of random U32: " << (double)numRandoms / timeit(generateRandomArray) << " randoms/sec" << std::endl;
-		generateRandomArray();
+		generateRandomFloatArray(randomArrayFloat, numRandoms, hostArrayFloat);
 
 		timer.timeStamp();
 		std::cout << "Generate array of random U32: " << (double)numRandoms / timer.getAverageDeltaInSeconds() << " randoms/sec" << std::endl;
@@ -81,7 +85,7 @@ int ArrayFireTest(int device)
 		timer.timeStamp();
 
 		// Generate a random unsigned array
-		generateRandomArray();
+		generateRandomFloatArray(randomArrayFloat, numRandoms, hostArrayFloat);
 		//array randomArrayU32 = randu(numRandoms, f32);	// was u32, which runs about the same speed
 		//af::sync();
 
@@ -96,7 +100,9 @@ int ArrayFireTest(int device)
 			sum += randomArray[i];
 		double mean = (double)sum / numRandoms;
 		std::cout << "Mean of ArrayFire random array = " << mean << std::endl;
+
 		delete[] randomArray;
+		delete[] hostArrayFloat;
 
 		//array sortedArrayU32, indexes;
 		//sort(sortedArrayU32, indexes, unsortedRandomArrayU32);
