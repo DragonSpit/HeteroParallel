@@ -407,32 +407,28 @@ int runLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, u
 			}
 			outputWorkIndex++;
 		}
-		printf("CPU        completed %d work items\nCUDA   GPU completed %d work items\nOpenCL GPU completed %d work items", numCpuWorkItemsDone, numCudaGpuWorkItemsDone, numOpenclGpuWorkItemsDone);
+		timer.timeStamp();
 
-		if (genSpec.resultDestination == ResultInCpuMemory && !genSpec.CudaGPU.allowedToWork)
+		printf("CPU        completed %d work items\nCUDA   GPU completed %d work items\nOpenCL GPU completed %d work items\n", numCpuWorkItemsDone, numCudaGpuWorkItemsDone, numOpenclGpuWorkItemsDone);
+
+		if (genSpec.resultDestination == ResultInCpuMemory && !genSpec.CudaGPU.allowedToWork && !genSpec.OpenclGPU.allowedToWork)
 		{
-			timer.timeStamp();
 			printf("To generate randoms by CPU only, ran at %zd floats/second\n", (size_t)((double)NumOfWorkItems * NumOfRandomsInWorkQuanta / timer.getAverageDeltaInSeconds()));
-			printf("runLoadBalancerThread: Ran successfully. CPU generated %zd randoms, CudaGPU generated %zd randoms\n", resultArrayIndex_CPU, resultArrayIndex_GPU);
+			printf("CPU generated %0.0f%% randoms\n", (double)numCpuWorkItemsDone / NumOfWorkItems * 100);
 			benchmarkFile << NumOfWorkItems * NumOfRandomsInWorkQuanta << "\t" << (size_t)((double)NumOfWorkItems * NumOfRandomsInWorkQuanta / timer.getAverageDeltaInSeconds()) << endl;
-			timer.reset();
-			timer.timeStamp();
 		}
-		else if (genSpec.resultDestination == ResultInCpuMemory && genSpec.CudaGPU.allowedToWork)
+		else if (genSpec.resultDestination == ResultInCpuMemory && genSpec.CudaGPU.allowedToWork && genSpec.OpenclGPU.allowedToWork)
 		{
-			timer.timeStamp();
 			printf("Just generation of randoms runs at %zd floats/second\n", (size_t)((double)NumOfWorkItems * NumOfRandomsInWorkQuanta / timer.getAverageDeltaInSeconds()));
-			printf("runLoadBalancerThread: Ran successfully. CPU generated %zd randoms, CudaGPU generated %zd randoms.\nAsked to generate %zd, generated %zd\n",
-				resultArrayIndex_CPU, resultArrayIndex_GPU, NumOfRandomsToGenerate, resultArrayIndex_CPU + resultArrayIndex_GPU);
+			printf("CPU generated %0.0f%% randoms, CUDA GPU generated %0.0f%% randoms, OpenCL GPU generated %0.0f%% randoms\n",
+				(double)numCpuWorkItemsDone / NumOfWorkItems * 100, (double)numCudaGpuWorkItemsDone / NumOfWorkItems * 100, (double)numOpenclGpuWorkItemsDone / NumOfWorkItems * 100);
 			benchmarkFile << NumOfWorkItems * NumOfRandomsInWorkQuanta << "\t" << (size_t)((double)NumOfWorkItems * NumOfRandomsInWorkQuanta / timer.getAverageDeltaInSeconds()) << endl;
-			timer.reset();
 		}
 		else if ((genSpec.resultDestination == ResultInEachDevicesMemory && genSpec.CudaGPU.allowedToWork) ||
 			     (genSpec.resultDestination == ResultInCudaGpuMemory     && genSpec.CudaGPU.allowedToWork))
 		{
-			timer.timeStamp();
 			printf("Just generation of randoms runs at %zd floats/second\n", (size_t)((double)NumOfWorkItems * NumOfRandomsInWorkQuanta / timer.getAverageDeltaInSeconds()));
-			printf("runLoadBalancerThread: Ran successfully. CPU generated %zd randoms, CudaGPU generated %zd randoms.\nAsked to generate %zd, generated %zd\n",
+			printf("CPU generated %zd randoms, CudaGPU generated %zd randoms.\nAsked to generate %zd, generated %zd\n",
 				resultArrayIndex_CPU, resultArrayIndex_GPU, NumOfRandomsToGenerate, resultArrayIndex_CPU + resultArrayIndex_GPU);
 			benchmarkFile << NumOfWorkItems * NumOfRandomsInWorkQuanta << "\t" << (size_t)((double)NumOfWorkItems * NumOfRandomsInWorkQuanta / timer.getAverageDeltaInSeconds()) << endl;
 			timer.reset();
