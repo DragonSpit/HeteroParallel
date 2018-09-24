@@ -156,6 +156,98 @@ int loadBalancerDestroyEventsAndThreads(void)
 
 	return 0;
 }
+
+int InitialCpuGenWork(RandomsToGenerate & genSpec, const size_t & NumOfRandomsInWorkQuanta, float * resultArray_CPU, size_t & resultArrayIndex_CPU, size_t & inputWorkIndex)
+{
+	if (genSpec.CPU.allowedToWork &&
+		(genSpec.resultDestination == ResultInCpuMemory || genSpec.resultDestination == ResultInEachDevicesMemory ||	// TODO: Where the result is going should not even matter, as long as CPU is allowed to do work, it should do work
+			genSpec.resultDestination == ResultInCudaGpuMemory || genSpec.resultDestination == ResultInOpenclGpuMemory)) {
+		//printf("First CPU work item\n");
+		workCPU.WorkerType = ComputeEngine::CPU;
+		workCPU.AmountOfWork = NumOfRandomsInWorkQuanta;
+		workCPU.HostResultPtr = (char *)(&(resultArray_CPU[resultArrayIndex_CPU]));
+		//printf("Event set for work item for MultiCore CPU\n");
+		if (!SetEvent(ghEventHaveWorkItemForCpu))	// signal that CPU has a work item to work on
+		{
+			printf("SetEvent ghEventWorkForCpu failed (%d)\n", GetLastError());
+			return -5;
+		}
+		resultArrayIndex_CPU += NumOfRandomsInWorkQuanta;
+		inputWorkIndex++;
+	}
+	return 0;
+}
+
+int InitialGpuGenWork(RandomsToGenerate & genSpec, const size_t & NumOfRandomsInWorkQuanta,
+						float * resultArray_GPU, size_t & resultArrayIndex_GPU, float * resultArray_CPU, size_t & resultArrayIndex_CPU,
+						size_t & inputWorkIndex)
+{
+	if (genSpec.CudaGPU.allowedToWork &&
+		(genSpec.resultDestination == ResultInCpuMemory || genSpec.resultDestination == ResultInEachDevicesMemory ||	// TODO: Where the result is going should not even matter, as long as CudaGpu is allowed to do work, it should do work
+			genSpec.resultDestination == ResultInCudaGpuMemory || genSpec.resultDestination == ResultInOpenclGpuMemory)) {
+		if ((resultArrayIndex_GPU + NumOfRandomsInWorkQuanta) < genSpec.CudaGPU.maxRandoms) {
+			//printf("First CudaGPU work item\n");
+			workCudaGPU.WorkerType = ComputeEngine::CUDA_GPU;
+			workCudaGPU.AmountOfWork = NumOfRandomsInWorkQuanta;
+			workCudaGPU.DeviceResultPtr = (char *)(&(resultArray_GPU[resultArrayIndex_GPU]));
+			if (genSpec.resultDestination == ResultInCpuMemory) {
+				workCudaGPU.HostResultPtr = (char *)(&(resultArray_CPU[resultArrayIndex_CPU]));
+				resultArrayIndex_CPU += NumOfRandomsInWorkQuanta;		// TODO: Figure out how to handle different size workQuanta between CPU and GPU and knowing when work is done
+																		// don't advance GPU array index, since we reuse the same result array
+			}
+			else if (genSpec.resultDestination == ResultInEachDevicesMemory || genSpec.resultDestination == ResultInCudaGpuMemory) {
+				workCudaGPU.HostResultPtr = NULL;
+				resultArrayIndex_GPU += NumOfRandomsInWorkQuanta;
+				// don't advance CPU array index
+			}
+			//printf("Cuda GPU work item: amountOfWork = %d at GPU memory address %p\n", workCudaGPU.AmountOfWork, workCudaGPU.DeviceResultPtr);
+			//printf("Event set for work item for CUDA GPU\n");
+			if (!SetEvent(ghEventHaveWorkItemForCudaGpu))		// signal that CudaGpu has a work item to work on
+			{
+				printf("SetEvent ghEventHaveWorkItemForCudaGpu failed (%d)\n", GetLastError());
+				return -6;
+			}
+			inputWorkIndex++;
+		}
+	}
+	return 0;
+}
+
+int InitialOpenclGpuGenWork(RandomsToGenerate & genSpec, const size_t & NumOfRandomsInWorkQuanta,
+							float * resultArray_GPU, size_t & resultArrayIndex_GPU, float * resultArray_CPU, size_t & resultArrayIndex_CPU,
+							size_t & inputWorkIndex)
+{
+	if (genSpec.OpenclGPU.allowedToWork &&
+		(genSpec.resultDestination == ResultInCpuMemory     || genSpec.resultDestination == ResultInEachDevicesMemory ||	// TODO: Where the result is going should not even matter, as long as CudaGpu is allowed to do work, it should do work
+		 genSpec.resultDestination == ResultInCudaGpuMemory || genSpec.resultDestination == ResultInOpenclGpuMemory)) {
+		if ((resultArrayIndex_GPU + NumOfRandomsInWorkQuanta) < genSpec.OpenclGPU.maxRandoms) {
+			//printf("First OpenclGPU work item\n");
+			workOpenclGPU.WorkerType = ComputeEngine::OPENCL_GPU;
+			workOpenclGPU.AmountOfWork = NumOfRandomsInWorkQuanta;
+			workOpenclGPU.DeviceResultPtr = NULL;
+			if (genSpec.resultDestination == ResultInCpuMemory) {
+				workOpenclGPU.HostResultPtr = (char *)(&(resultArray_CPU[resultArrayIndex_CPU]));
+				resultArrayIndex_CPU += NumOfRandomsInWorkQuanta;		// TODO: Figure out how to handle different size workQuanta between CPU and GPU and knowing when work is done
+																		// don't advance GPU array index, since we reuse the same result array
+			}
+			else if (genSpec.resultDestination == ResultInEachDevicesMemory || genSpec.resultDestination == ResultInOpenclGpuMemory) {
+				workOpenclGPU.HostResultPtr = NULL;
+				resultArrayIndex_GPU += NumOfRandomsInWorkQuanta;
+				// don't advance CPU array index
+			}
+			//printf("OpenCL GPU work item: amountOfWork = %d at GPU memory address %p\n", workOpenclGPU.AmountOfWork, workOpenclGPU.DeviceResultPtr);
+			//printf("Event set for work item for OpenCL GPU\n");
+			if (!SetEvent(ghEventHaveWorkItemForOpenclGpu))		// signal that OpenclGpu has a work item to work on
+			{
+				printf("SetEvent ghEventHaveWorkItemForOpenclGpu failed (%d)\n", GetLastError());
+				return -6;
+			}
+			inputWorkIndex++;
+		}
+	}
+	return 0;
+}
+
 // TODO: Capture the pattern of load balancing any algorithm, possibly using a template to load balance anything.
 // numTimes is needed to see if running the first time is slower than running subsequent times, as this is commonly the case due to OS paging and CPU caching
 int runLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, unsigned numTimes)
@@ -188,90 +280,16 @@ int runLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, u
 		size_t inputWorkIndex = 0;
 		if (NumOfWorkItems > 0) {	// CPU work item
 			// TODO: Consider all combinations of where the randoms end up and who is allowed to help generate them. Is there a way to handle them in a general way (flags)?
-			if  (genSpec.CPU.allowedToWork &&
-				(genSpec.resultDestination == ResultInCpuMemory     || genSpec.resultDestination == ResultInEachDevicesMemory ||	// TODO: Where the result is going should not even matter, as long as CPU is allowed to do work, it should do work
-				 genSpec.resultDestination == ResultInCudaGpuMemory || genSpec.resultDestination == ResultInOpenclGpuMemory)) {
-				//printf("First CPU work item\n");
-				workCPU.WorkerType = ComputeEngine::CPU;
-				workCPU.AmountOfWork = NumOfRandomsInWorkQuanta;
-				workCPU.HostResultPtr = (char *)(&(randomFloatArray_CPU[resultArrayIndex_CPU]));
-				//printf("Event set for work item for MultiCore CPU\n");
-				if (!SetEvent(ghEventHaveWorkItemForCpu))	// signal that CPU has a work item to work on
-				{
-					printf("SetEvent ghEventWorkForCpu failed (%d)\n", GetLastError());
-					return -5;
-				}
-				resultArrayIndex_CPU += NumOfRandomsInWorkQuanta;
-				inputWorkIndex++;
-			}
+			int returnValue = InitialCpuGenWork(genSpec, NumOfRandomsInWorkQuanta, randomFloatArray_CPU, resultArrayIndex_CPU, inputWorkIndex);
+			if (returnValue != 0) return returnValue;
 		}
 		if (NumOfWorkItems > 1) {	// CudaGpu work item
-			if  (genSpec.CudaGPU.allowedToWork &&
-				(genSpec.resultDestination == ResultInCpuMemory     || genSpec.resultDestination == ResultInEachDevicesMemory ||	// TODO: Where the result is going should not even matter, as long as CudaGpu is allowed to do work, it should do work
-				 genSpec.resultDestination == ResultInCudaGpuMemory || genSpec.resultDestination == ResultInOpenclGpuMemory)) {
-				if ((resultArrayIndex_GPU + NumOfRandomsInWorkQuanta) < genSpec.CudaGPU.maxRandoms) {
-					//printf("First CudaGPU work item\n");
-					workCudaGPU.WorkerType   = ComputeEngine::CUDA_GPU;
-					workCudaGPU.AmountOfWork = NumOfRandomsInWorkQuanta;
-					workCudaGPU.DeviceResultPtr    = (char *)(&(randomFloatArray_GPU[resultArrayIndex_GPU]));
-					if (genSpec.resultDestination == ResultInCpuMemory) {
-						workCudaGPU.HostResultPtr = (char *)(&(randomFloatArray_CPU[resultArrayIndex_CPU]));
-						resultArrayIndex_CPU += NumOfRandomsInWorkQuanta;		// TODO: Figure out how to handle different size workQuanta between CPU and GPU and knowing when work is done
-						// don't advance GPU array index, since we reuse the same result array
-					}
-					else if (genSpec.resultDestination == ResultInEachDevicesMemory || genSpec.resultDestination == ResultInCudaGpuMemory) {
-						workCudaGPU.HostResultPtr = NULL;
-						resultArrayIndex_GPU += NumOfRandomsInWorkQuanta;
-						// don't advance CPU array index
-					}
-					//printf("Cuda GPU work item: amountOfWork = %d at GPU memory address %p\n", workCudaGPU.AmountOfWork, workCudaGPU.DeviceResultPtr);
-					//printf("Event set for work item for CUDA GPU\n");
-					if (!SetEvent(ghEventHaveWorkItemForCudaGpu))		// signal that CudaGpu has a work item to work on
-					{
-						printf("SetEvent ghEventHaveWorkItemForCudaGpu failed (%d)\n", GetLastError());
-						return -6;
-					}
-					inputWorkIndex++;
-				}
-			}
-			//else {
-			//	printf("Error #1: Unsupported combination of genSpec\n");
-			//	return -1;
-			//}
+			int returnValue = InitialGpuGenWork(genSpec, NumOfRandomsInWorkQuanta, randomFloatArray_GPU, resultArrayIndex_GPU, randomFloatArray_CPU, resultArrayIndex_CPU, inputWorkIndex);
+			if (returnValue != 0) return returnValue;
 		}
 		if (NumOfWorkItems > 2) {	// OpenclGpu work item
-			if (genSpec.OpenclGPU.allowedToWork &&
-				(genSpec.resultDestination == ResultInCpuMemory     || genSpec.resultDestination == ResultInEachDevicesMemory ||	// TODO: Where the result is going should not even matter, as long as CudaGpu is allowed to do work, it should do work
-				 genSpec.resultDestination == ResultInCudaGpuMemory || genSpec.resultDestination == ResultInOpenclGpuMemory)) {
-				if ((resultArrayIndex_GPU + NumOfRandomsInWorkQuanta) < genSpec.OpenclGPU.maxRandoms) {
-					//printf("First OpenclGPU work item\n");
-					workOpenclGPU.WorkerType = ComputeEngine::OPENCL_GPU;
-					workOpenclGPU.AmountOfWork = NumOfRandomsInWorkQuanta;
-					workOpenclGPU.DeviceResultPtr = NULL;
-					if (genSpec.resultDestination == ResultInCpuMemory) {
-						workOpenclGPU.HostResultPtr = (char *)(&(randomFloatArray_CPU[resultArrayIndex_CPU]));
-						resultArrayIndex_CPU += NumOfRandomsInWorkQuanta;		// TODO: Figure out how to handle different size workQuanta between CPU and GPU and knowing when work is done
-																				// don't advance GPU array index, since we reuse the same result array
-					}
-					else if (genSpec.resultDestination == ResultInEachDevicesMemory || genSpec.resultDestination == ResultInOpenclGpuMemory) {
-						workOpenclGPU.HostResultPtr = NULL;
-						resultArrayIndex_GPU += NumOfRandomsInWorkQuanta;
-						// don't advance CPU array index
-					}
-					//printf("OpenCL GPU work item: amountOfWork = %d at GPU memory address %p\n", workOpenclGPU.AmountOfWork, workOpenclGPU.DeviceResultPtr);
-					//printf("Event set for work item for OpenCL GPU\n");
-					if (!SetEvent(ghEventHaveWorkItemForOpenclGpu))		// signal that OpenclGpu has a work item to work on
-					{
-						printf("SetEvent ghEventHaveWorkItemForOpenclGpu failed (%d)\n", GetLastError());
-						return -6;
-					}
-					inputWorkIndex++;
-				}
-			}
-			//else {
-			//	printf("Error #1: Unsupported combination of genSpec\n");
-			//	return -1;
-			//}
+			int returnValue = InitialOpenclGpuGenWork(genSpec, NumOfRandomsInWorkQuanta, randomFloatArray_GPU, resultArrayIndex_GPU, randomFloatArray_CPU, resultArrayIndex_CPU, inputWorkIndex);
+			if (returnValue != 0) return returnValue;
 		}
 
 		DWORD dwEvent;
@@ -348,10 +366,6 @@ int runLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, u
 							//printf("Gave new work item to GPU. resultArrayIndex = %zd. Completed %zd work items\n", resultArrayIndex_GPU, numCudaGpuWorkItemsDone);
 						}
 					}
-					//else {
-					//	printf("Error #2: Unsupported combination of genSpec\n");
-					//	return -1;
-					//}
 				}
 				numCudaGpuWorkItemsDone++;
 				break;
@@ -388,10 +402,6 @@ int runLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, u
 							//printf("Gave new work item to OpenCL GPU. resultArrayIndex = %zd. Completed %zd work items\n", resultArrayIndex_GPU, numCudaGpuWorkItemsDone);
 						}
 					}
-					//else {
-					//	printf("Error #2: Unsupported combination of genSpec\n");
-					//	return -1;
-					//}
 				}
 				numOpenclGpuWorkItemsDone++;
 				break;
