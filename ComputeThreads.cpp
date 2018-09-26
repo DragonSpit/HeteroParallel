@@ -157,7 +157,7 @@ int loadBalancerDestroyEventsAndThreads(void)
 	return 0;
 }
 
-int InitialCpuGenWork(RandomsToGenerate & genSpec, const size_t & NumOfRandomsInWorkQuanta, float * resultArray_CPU, size_t & resultArrayIndex_CPU, size_t & inputWorkIndex)
+int CpuGenerateWork(RandomsToGenerate & genSpec, const size_t & NumOfRandomsInWorkQuanta, float * resultArray_CPU, size_t & resultArrayIndex_CPU, size_t & inputWorkIndex)
 {
 	if (genSpec.CPU.allowedToWork &&
 		(genSpec.resultDestination == ResultInCpuMemory || genSpec.resultDestination == ResultInEachDevicesMemory ||	// TODO: Where the result is going should not even matter, as long as CPU is allowed to do work, it should do work
@@ -280,7 +280,7 @@ int runLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, u
 		size_t inputWorkIndex = 0;
 		if (NumOfWorkItems > 0) {	// CPU work item
 			// TODO: Consider all combinations of where the randoms end up and who is allowed to help generate them. Is there a way to handle them in a general way (flags)?
-			int returnValue = InitialCpuGenWork(genSpec, NumOfRandomsInWorkQuanta, randomFloatArray_CPU, resultArrayIndex_CPU, inputWorkIndex);
+			int returnValue = CpuGenerateWork(genSpec, NumOfRandomsInWorkQuanta, randomFloatArray_CPU, resultArrayIndex_CPU, inputWorkIndex);
 			if (returnValue != 0) return returnValue;
 		}
 		if (NumOfWorkItems > 1) {	// CudaGpu work item
@@ -314,22 +314,8 @@ int runLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, u
 				//printf("ghEventsComputeDone CPU event was signaled.\n");
 				if (inputWorkIndex < NumOfWorkItems)	// Create new work item for CPU
 				{
-					if (genSpec.CPU.allowedToWork &&
-					   (genSpec.resultDestination == ResultInCpuMemory || genSpec.resultDestination == ResultInEachDevicesMemory ||	// TODO: Where the result is going should not even matter, as long as CPU is allowed to do work, it should do work
-						genSpec.resultDestination == ResultInCudaGpuMemory || genSpec.resultDestination == ResultInOpenclGpuMemory)) {
-						//printf("Another CPU work item\n");
-						workCPU.WorkerType = ComputeEngine::CPU;
-						workCPU.AmountOfWork = NumOfRandomsInWorkQuanta;
-						workCPU.HostResultPtr = (char *)(&(randomFloatArray_CPU[resultArrayIndex_CPU]));
-						if (!SetEvent(ghEventHaveWorkItemForCpu))	// Set one event to the signaled state
-						{
-							printf("SetEvent ghEventWorkForCpu failed (%d)\n", GetLastError());
-							return -5;
-						}
-						inputWorkIndex++;
-						//printf("Gave new work item to CPU. resultArrayIndex = %zd. Completed %zd work items\n", resultArrayIndex, workCompletedByCPU);
-						resultArrayIndex_CPU += NumOfRandomsInWorkQuanta;
-					}
+					int returnValue = CpuGenerateWork(genSpec, NumOfRandomsInWorkQuanta, randomFloatArray_CPU, resultArrayIndex_CPU, inputWorkIndex);
+					if (returnValue != 0) return returnValue;
 				}
 				numCpuWorkItemsDone++;
 				break;
