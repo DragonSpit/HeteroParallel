@@ -114,7 +114,8 @@
     <ClCompile Include="ComputeThreadCpu.cpp" />
     <ClCompile Include="ComputeThreadOpenclGpu.cpp" />
     <ClCompile Include="ComputeThreadCudaGpu.cpp" />
-    <ClCompile Include="ComputeThreads.cpp" />
+    <ClCompile Include="ComputeThreadsRngRun.cpp" />
+    <ClCompile Include="ComputeThreadsRngSetup.cpp" />
     <ClCompile Include="flowGraphExamples.cpp" />
     <ClCompile Include="OpenClHelloWorld.cpp" />
     <ClCompile Include="OpenClSecondExample.cpp" />
