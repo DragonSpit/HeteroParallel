@@ -26,13 +26,9 @@ extern HANDLE ghEventHaveWorkItemForCudaGpu;	// when asserted, work item for Cud
 extern WorkItemType workOpenclGPU;
 extern HANDLE ghEventHaveWorkItemForOpenclGpu;
 
-extern DWORD WINAPI ThreadMultiCoreCpuCompute(LPVOID);
-extern DWORD WINAPI ThreadCudaGpuCompute(LPVOID);
-extern DWORD WINAPI ThreadOpenclGpuCompute(LPVOID);
-
 extern CudaRngEncapsulation			* gCudaRngSupport;			// TODO: Make sure to delete it once done
-extern CudaMemoryEncapsulation		* gCudaMemorySupport;		// TODO: Make sure to delete it once done
 extern OpenClGpuRngEncapsulation    * gOpenClRngSupport;		// TODO: Make sure to delete it once done
+extern CudaMemoryEncapsulation		* gCudaMemorySupport;		// TODO: Make sure to delete it once done
 extern OpenClGpuMemoryEncapsulation	* gOpenClMemorySupport;		// TODO: Make sure to delete it once done
 
 extern HANDLE ghEventsComputeDone[NumComputeDoneEvents];	// 0 - CPU, 1 - CudaGpu, 2 - OpenClGpu, 3 - OpenClFpga
@@ -47,6 +43,7 @@ int CpuGenerateWork(RandomsToGenerate & genSpec, const size_t & NumOfRandomsInWo
 		workCPU.WorkerType = ComputeEngine::CPU;
 		workCPU.AmountOfWork = NumOfRandomsInWorkQuanta;
 		workCPU.HostResultPtr = (char *)(&(resultArray_CPU[resultArrayIndex_CPU]));
+		workCudaGPU.DeviceResultPtr = NULL;
 		//printf("Event set for work item for MultiCore CPU\n");
 		if (!SetEvent(ghEventHaveWorkItemForCpu))	// signal that CPU has a work item to work on
 		{
@@ -169,7 +166,7 @@ int runLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, u
 			if (returnValue != 0) return returnValue;
 		}
 		if (NumOfWorkItems > 2) {	// OpenclGpu work item
-			int returnValue = OpenclGpuGenerateWork(genSpec, NumOfRandomsInWorkQuanta, randomFloatArray_GPU, resultArrayIndex_GPU, randomFloatArray_CPU, resultArrayIndex_CPU, inputWorkIndex);
+			int returnValue = OpenclGpuGenerateWork(genSpec, NumOfRandomsInWorkQuanta, NULL, resultArrayIndex_GPU, randomFloatArray_CPU, resultArrayIndex_CPU, inputWorkIndex);
 			if (returnValue != 0) return returnValue;
 		}
 
