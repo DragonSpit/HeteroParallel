@@ -153,7 +153,7 @@ wmain(int argc, char **argv)
 	//openClHelloWorld();
 	//secondOnenClExample();
 
-	//ArrayFireTest(0);	// CUDA GPU (950M)
+	ArrayFireTest(0);	// CUDA GPU (950M)
 	//ArrayFireTest(1);	// Intel OpenCL GPU (530)
 	//ArrayFireTest(2);	// Intel OpenCL quad-core CPU (i5-6300HQ)
 	//ArrayFireIntegerExample(1);

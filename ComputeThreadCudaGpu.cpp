@@ -23,8 +23,9 @@ extern bool gRunComputeWorkers;
 WorkItemType workCudaGPU;			// work item for Cuda GPU to do. This is to be setup before ghEventHaveWorkItemForCudaGpu gets set to notify the CPU thread to start working on it
 HANDLE ghEventHaveWorkItemForCudaGpu;	// when asserted, work item for Cuda GPU is ready
 
-CudaRngEncapsulation    * gCudaRngSupport    = NULL;	// TODO: Make sure to delete it once done
-CudaMemoryEncapsulation * gCudaMemorySupport = NULL;	// TODO: Make sure to delete it once done
+CudaRngEncapsulation    * gCudaRngSupport   = NULL;	// TODO: Make sure to delete it once done
+CudaMemoryEncapsulation * gCudaResultMemory = NULL;	// TODO: Make sure to delete it once done
+CudaMemoryEncapsulation * gCudaSourceMemory = NULL;	// TODO: Make sure to delete it once done
 
 DWORD WINAPI ThreadCudaGpuCompute(LPVOID lpParam)
 {

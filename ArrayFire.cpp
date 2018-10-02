@@ -6,9 +6,9 @@
 
 using namespace af;
 static size_t numRandoms = 16 * 1024 * 1024;
-array unsortedRandomArrayU32;
-array sortedArrayU32;
-array indexes;
+af::array unsortedRandomArrayU32;
+af::array sortedArrayU32;
+af::array indexes;
 
 void generateRandomFloatArray(array& randomArrayFloat, size_t numRandoms, float* hostDestArray)
 {
@@ -26,7 +26,7 @@ void generateRandomArrayInChunks(int device, size_t numChunks, size_t chunkSize,
 	af::setDevice(device);
 	af::info();
 
-	array randomArrayFloat(numChunks * chunkSize, f32);	// the overall array
+	af::array randomArrayFloat(numChunks * chunkSize, f32);	// the overall array
 	setSeed(seed);
 
 	timer.reset();
@@ -51,13 +51,29 @@ void generateRandomArrayInChunks(int device, size_t numChunks, size_t chunkSize,
 	delete[] randomArray;
 }
 
-void sortArray()
+//void sortArray1()
+//{
+//	//af_print(randomArrayU32);
+//	//array sortedArrayU32, indexes;
+//	sort(sortedArrayU32, indexes, unsortedRandomArrayU32);
+//	//af_print(sortedArrayU32);
+//	//af_print(indexes);
+//}
+
+void sortArray(unsigned * inHostArray, size_t numItems, unsigned * outHostArray)
 {
-	//af_print(randomArrayU32);
-	//array sortedArrayU32, indexes;
-	sort(sortedArrayU32, indexes, unsortedRandomArrayU32);
-	//af_print(sortedArrayU32);
-	//af_print(indexes);
+	af::array unsortedArrayU32(numItems, inHostArray);
+	sortedArrayU32 = af::sort(unsortedArrayU32);
+	af::sync();										// TODO: Is it necessary to sync before starting a copy to host memory??!
+	sortedArrayU32.host((void *)outHostArray);
+	af::sync();
+
+	//af::array unsortedArrayU32(numItems, inHostArray);
+	//af::array sortedArrayU32(numItems);
+	//sortedArrayU32 = af::sort(unsortedRandomArrayU32);
+	//af::sync();										// TODO: Is it necessary to sync before starting a copy to host memory??!
+	//sortedArrayU32.host((void *)outHostArray);
+	//af::sync();
 }
 
 int ArrayFireTest(int device)
@@ -92,17 +108,25 @@ int ArrayFireTest(int device)
 		timer.timeStamp();
 		std::cout << "Generate array of random U32: " << (double)numRandoms / timer.getAverageDeltaInSeconds() << " randoms/sec" << std::endl;
 
-		float * randomArray = new float [numRandoms];
-		//randomArrayU32.host((void *)randomArray);
-
 		double sum = 0;
 		for (unsigned long i = 0; i < numRandoms; i++)
-			sum += randomArray[i];
+			sum += hostArrayFloat[i];
 		double mean = (double)sum / numRandoms;
 		std::cout << "Mean of ArrayFire random array = " << mean << std::endl;
 
-		delete[] randomArray;
 		delete[] hostArrayFloat;
+
+		static size_t numItems = 1 * 1024 * 1024;
+		unsigned * inHostArray  = new unsigned [numItems];
+		unsigned * outHostArray = new unsigned [numItems];
+
+		timer.reset();
+		timer.timeStamp();
+
+		sortArray(inHostArray, numItems, outHostArray);
+
+		timer.timeStamp();
+		std::cout << "Sort ArrayFire: " << (double)numRandoms / timer.getAverageDeltaInSeconds() << " unsigned/sec" << std::endl;
 
 		//array sortedArrayU32, indexes;
 		//sort(sortedArrayU32, indexes, unsortedRandomArrayU32);

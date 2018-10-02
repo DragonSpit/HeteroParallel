@@ -28,20 +28,20 @@ extern HANDLE ghEventHaveWorkItemForOpenclGpu;
 
 extern CudaRngEncapsulation			* gCudaRngSupport;			// TODO: Make sure to delete it once done
 extern OpenClGpuRngEncapsulation    * gOpenClRngSupport;		// TODO: Make sure to delete it once done
-extern CudaMemoryEncapsulation		* gCudaMemorySupport;		// TODO: Make sure to delete it once done
+extern CudaMemoryEncapsulation		* gCudaResultMemory;		// TODO: Make sure to delete it once done
 extern OpenClGpuMemoryEncapsulation	* gOpenClMemorySupport;		// TODO: Make sure to delete it once done
 
 extern HANDLE ghEventsComputeDone[NumComputeDoneEvents];	// 0 - CPU, 1 - CudaGpu, 2 - OpenClGpu, 3 - OpenClFpga
 extern bool   gRunComputeWorkers;
 
-int CpuGenerateWork(RandomsToGenerate & genSpec, const size_t & NumOfRandomsInWorkQuanta, float * resultArray_CPU, size_t & resultArrayIndex_CPU, size_t & inputWorkIndex)
+int CpuGenerateWork(RandomsToGenerate & genSpec, const size_t & NumOfItemsInWorkQuanta, float * resultArray_CPU, size_t & resultArrayIndex_CPU, size_t & inputWorkIndex)
 {
 	if (genSpec.CPU.allowedToWork &&
 		(genSpec.resultDestination == ResultInCpuMemory || genSpec.resultDestination == ResultInEachDevicesMemory ||	// TODO: Where the result is going should not even matter, as long as CPU is allowed to do work, it should do work
 			genSpec.resultDestination == ResultInCudaGpuMemory || genSpec.resultDestination == ResultInOpenclGpuMemory)) {
 		//printf("First CPU work item\n");
 		workCPU.WorkerType = ComputeEngine::CPU;
-		workCPU.AmountOfWork = NumOfRandomsInWorkQuanta;
+		workCPU.AmountOfWork = NumOfItemsInWorkQuanta;
 		workCPU.HostResultPtr = (char *)(&(resultArray_CPU[resultArrayIndex_CPU]));
 		workCudaGPU.DeviceResultPtr = NULL;
 		//printf("Event set for work item for MultiCore CPU\n");
@@ -50,7 +50,7 @@ int CpuGenerateWork(RandomsToGenerate & genSpec, const size_t & NumOfRandomsInWo
 			printf("SetEvent ghEventWorkForCpu failed (%d)\n", GetLastError());
 			return -5;
 		}
-		resultArrayIndex_CPU += NumOfRandomsInWorkQuanta;
+		resultArrayIndex_CPU += NumOfItemsInWorkQuanta;
 		inputWorkIndex++;
 	}
 	return 0;
@@ -143,7 +143,7 @@ int runLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, u
 	else if (genSpec.resultDestination == ResultInCpuMemory)
 		NumOfWorkItems = NumOfWorkItems = NumOfRandomsToGenerate / NumOfRandomsInWorkQuanta;
 
-	float *randomFloatArray_GPU = (float *)gCudaMemorySupport->m_gpu_memory;
+	float *randomFloatArray_GPU = (float *)gCudaResultMemory->m_gpu_memory;
 	float *randomFloatArray_CPU = (float *)genSpec.generated.CPU.Buffer;
 
 	for (unsigned numRuns = 0; numRuns < numTimes; numRuns++)
