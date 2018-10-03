@@ -117,10 +117,10 @@ int OpenclGpuGenerateSortWork(SortToDo & sortSpec, const size_t & NumOfItemsInWo
 			//printf("First OpenclGPU work item\n");
 			workOpenclGPU.WorkerType    = ComputeEngine::OPENCL_GPU;
 			workOpenclGPU.AmountOfWork  = NumOfItemsInWorkQuanta;
-			workCudaGPU.DeviceSourcePtr = (char *)(&(sourceArray_GPU[sourceArrayIndex_GPU]));	// device memory is always used
-			workCudaGPU.DeviceResultPtr = (char *)(&(resultArray_GPU[resultArrayIndex_GPU]));
+			workOpenclGPU.DeviceSourcePtr = (char *)(&(sourceArray_GPU[sourceArrayIndex_GPU]));	// device memory is always used
+			workOpenclGPU.DeviceResultPtr = (char *)(&(resultArray_GPU[resultArrayIndex_GPU]));
 			if (sourceArray_CPU != NULL) {
-				workCudaGPU.HostSourcePtr = (char *)(&(sourceArray_CPU[sourceArrayIndex_CPU]));
+				workOpenclGPU.HostSourcePtr = (char *)(&(sourceArray_CPU[sourceArrayIndex_CPU]));
 				sourceArrayIndex_CPU += NumOfItemsInWorkQuanta;		// TODO: Figure out how to handle different size workQuanta between CPU and GPU and knowing when work is done
 			}
 			if (sortSpec.resultDestination == ResultInCpuMemory) {
@@ -166,8 +166,9 @@ int runLoadBalancerSortThread(SortToDo& sortSpec, ofstream& benchmarkFile, unsig
 	//TODO: need source device memory!
 	unsigned long *sourceUnsortedArray_CudaGPU = (unsigned long *)gCudaSourceMemory->m_gpu_memory;
 	unsigned long *resultSortedArray_CudaGPU   = (unsigned long *)gCudaResultMemory->m_gpu_memory;
-	unsigned long *sourceUnsortedArray_OpenClGPU = (unsigned long *)gOpenClSourceMemory->m_gpu_memory;
-	unsigned long *resultSortedArray_OpenClGPU   = (unsigned long *)gOpenClResultMemory->m_gpu_memory;
+	// TODO: OpenCL memory for now needs to be host memory, as we are getting sorting to work from host to host memory first
+	//unsigned long *sourceUnsortedArray_OpenClGPU = (unsigned long *)gOpenClSourceMemory->m_gpu_memory;
+	//unsigned long *resultSortedArray_OpenClGPU   = (unsigned long *)gOpenClResultMemory->m_gpu_memory;
 	unsigned long *sourceUnsortedArray_CPU     = (unsigned long *)sortSpec.Unsorted.CPU.Buffer;
 	unsigned long *resultSortedArray_CPU       = (unsigned long *)sortSpec.Sorted.CPU.Buffer;
 
