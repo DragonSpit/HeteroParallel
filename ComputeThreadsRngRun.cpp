@@ -29,7 +29,7 @@ extern HANDLE ghEventHaveWorkItemForOpenclGpu;
 extern CudaRngEncapsulation			* gCudaRngSupport;			// TODO: Make sure to delete it once done
 extern OpenClGpuRngEncapsulation    * gOpenClRngSupport;		// TODO: Make sure to delete it once done
 extern CudaMemoryEncapsulation		* gCudaResultMemory;		// TODO: Make sure to delete it once done
-extern OpenClGpuMemoryEncapsulation	* gOpenClMemorySupport;		// TODO: Make sure to delete it once done
+extern OpenClGpuMemoryEncapsulation	* gOpenClResultMemory;		// TODO: Make sure to delete it once done
 
 extern HANDLE ghEventsComputeDone[NumComputeDoneEvents];	// 0 - CPU, 1 - CudaGpu, 2 - OpenClGpu, 3 - OpenClFpga
 extern bool   gRunComputeWorkers;

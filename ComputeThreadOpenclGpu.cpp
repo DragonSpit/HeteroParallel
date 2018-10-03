@@ -25,8 +25,9 @@ extern bool gRunComputeWorkers;
 WorkItemType workOpenclGPU;			// work item for Cuda GPU to do. This is to be setup before ghEventHaveWorkItemForCudaGpu gets set to notify the CPU thread to start working on it
 HANDLE ghEventHaveWorkItemForOpenclGpu;	// when asserted, work item for Cuda GPU is ready
 
-OpenClGpuRngEncapsulation    * gOpenClRngSupport    = NULL;	// TODO: Make sure to delete it once done
-OpenClGpuMemoryEncapsulation * gOpenClMemorySupport = NULL;	// TODO: Make sure to delete it once done
+OpenClGpuRngEncapsulation    * gOpenClRngSupport   = NULL;	// TODO: Make sure to delete it once done
+OpenClGpuMemoryEncapsulation * gOpenClSourceMemory = NULL;	// TODO: Make sure to delete it once done
+OpenClGpuMemoryEncapsulation * gOpenClResultMemory = NULL;	// TODO: Make sure to delete it once done
 
 DWORD WINAPI ThreadOpenclGpuCompute(LPVOID lpParam)
 {
@@ -53,7 +54,7 @@ DWORD WINAPI ThreadOpenclGpuCompute(LPVOID lpParam)
 
 		//Sleep(2000);	// for debug, to slow GPU down artificially for each work item
 		bool verify = false;
-		generateRandomFloatArray(gOpenClMemorySupport->m_gpu_memory, workOpenclGPU.AmountOfWork, (float *)workOpenclGPU.HostResultPtr);
+		generateRandomFloatArray(gOpenClResultMemory->m_gpu_memory, workOpenclGPU.AmountOfWork, (float *)workOpenclGPU.HostResultPtr);
 
 		// Signal the associated event to indicate work item has been finished
 		//printf("ThreadOpenclGpuCompute %d done with work item. Signaling dispatcher\n", GetCurrentThreadId());

@@ -24,8 +24,8 @@ WorkItemType workCudaGPU;			// work item for Cuda GPU to do. This is to be setup
 HANDLE ghEventHaveWorkItemForCudaGpu;	// when asserted, work item for Cuda GPU is ready
 
 CudaRngEncapsulation    * gCudaRngSupport   = NULL;	// TODO: Make sure to delete it once done
-CudaMemoryEncapsulation * gCudaResultMemory = NULL;	// TODO: Make sure to delete it once done
 CudaMemoryEncapsulation * gCudaSourceMemory = NULL;	// TODO: Make sure to delete it once done
+CudaMemoryEncapsulation * gCudaResultMemory = NULL;	// TODO: Make sure to delete it once done
 
 DWORD WINAPI ThreadCudaGpuCompute(LPVOID lpParam)
 {

@@ -33,7 +33,7 @@ extern DWORD WINAPI ThreadOpenclGpuCompute(LPVOID);
 extern CudaRngEncapsulation			* gCudaRngSupport;			// TODO: Make sure to delete it once done
 extern CudaMemoryEncapsulation		* gCudaResultMemory;		// TODO: Make sure to delete it once done
 extern OpenClGpuRngEncapsulation    * gOpenClRngSupport;		// TODO: Make sure to delete it once done
-extern OpenClGpuMemoryEncapsulation	* gOpenClMemorySupport;		// TODO: Make sure to delete it once done
+extern OpenClGpuMemoryEncapsulation	* gOpenClResultMemory;		// TODO: Make sure to delete it once done
 
 extern int runLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, unsigned numTimes);
 
@@ -286,7 +286,7 @@ int MemoryAllocatorOpenClGpu_GenRng(RandomsToGenerate& genSpec)
 	printf("Allocating OpenclGPU memory of %zd bytes\n", preallocateGPUmemorySize);
 
 	// CUDA memory allocation is extremely slow (seconds)!
-	gOpenClMemorySupport = new OpenClGpuMemoryEncapsulation(preallocateGPUmemorySize);
+	gOpenClResultMemory = new OpenClGpuMemoryEncapsulation(preallocateGPUmemorySize);
 	genSpec.OpenclGPU.itemsAllocated = preallocateGPUmemorySize / genSpec.OpenclGPU.sizeOfItem;
 
 	printf("NumOfRandomsToGenerate = %zd, OpenclGPU.workQuanta = %zd\n", genSpec.randomsToGenerate, genSpec.OpenclGPU.workQuanta);
