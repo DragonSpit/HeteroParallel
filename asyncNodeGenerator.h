@@ -27,6 +27,10 @@ enum ComputeEngine {
 	CPU = 0, CUDA_GPU, OPENCL_GPU, FPGA
 };
 
+enum WorkType {
+	GenerateRandoms = 0, Sort
+};
+
 const size_t NumComputeDoneEvents = 4;
 
 enum ResultDestination {
@@ -92,7 +96,8 @@ __int64 time_call(Function&& f)
 
 struct WorkItemType
 {
-	ComputeEngine WorkerType;	// what kind of worker this is
+	ComputeEngine ForWhichWorker;	// which type of worker this work item is intended for
+	WorkType TypeOfWork;			// what type of work item this is
 	size_t AmountOfWork;
 	char*  HostSourcePtr;		// host   memory pointer where the source data comes from
 	char*  HostResultPtr;		// host   memory pointer where the results will go

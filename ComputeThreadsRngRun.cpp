@@ -40,7 +40,8 @@ int CpuGenerateWork(RandomsToGenerate & genSpec, const size_t & NumOfItemsInWork
 		(genSpec.resultDestination == ResultInCpuMemory || genSpec.resultDestination == ResultInEachDevicesMemory ||	// TODO: Where the result is going should not even matter, as long as CPU is allowed to do work, it should do work
 			genSpec.resultDestination == ResultInCudaGpuMemory || genSpec.resultDestination == ResultInOpenclGpuMemory)) {
 		//printf("First CPU work item\n");
-		workCPU.WorkerType = ComputeEngine::CPU;
+		workCPU.TypeOfWork = GenerateRandoms;
+		workCPU.ForWhichWorker = ComputeEngine::CPU;
 		workCPU.AmountOfWork = NumOfItemsInWorkQuanta;
 		workCPU.HostResultPtr = (char *)(&(resultArray_CPU[resultArrayIndex_CPU]));
 		workCudaGPU.DeviceResultPtr = NULL;
@@ -65,7 +66,8 @@ int GpuGenerateWork(RandomsToGenerate & genSpec, const size_t & NumOfRandomsInWo
 			genSpec.resultDestination == ResultInCudaGpuMemory || genSpec.resultDestination == ResultInOpenclGpuMemory)) {
 		if ((resultArrayIndex_GPU + NumOfRandomsInWorkQuanta) < genSpec.CudaGPU.maxRandoms) {
 			//printf("First CudaGPU work item\n");
-			workCudaGPU.WorkerType = ComputeEngine::CUDA_GPU;
+			workCPU.TypeOfWork = GenerateRandoms;
+			workCudaGPU.ForWhichWorker = ComputeEngine::CUDA_GPU;
 			workCudaGPU.AmountOfWork = NumOfRandomsInWorkQuanta;
 			workCudaGPU.DeviceResultPtr = (char *)(&(resultArray_GPU[resultArrayIndex_GPU]));
 			if (genSpec.resultDestination == ResultInCpuMemory) {
@@ -100,7 +102,8 @@ int OpenclGpuGenerateWork(RandomsToGenerate & genSpec, const size_t & NumOfRando
 		 genSpec.resultDestination == ResultInCudaGpuMemory || genSpec.resultDestination == ResultInOpenclGpuMemory)) {
 		if ((resultArrayIndex_GPU + NumOfRandomsInWorkQuanta) < genSpec.OpenclGPU.maxRandoms) {
 			//printf("First OpenclGPU work item\n");
-			workOpenclGPU.WorkerType = ComputeEngine::OPENCL_GPU;
+			workCPU.TypeOfWork = GenerateRandoms;
+			workOpenclGPU.ForWhichWorker = ComputeEngine::OPENCL_GPU;
 			workOpenclGPU.AmountOfWork = NumOfRandomsInWorkQuanta;
 			workOpenclGPU.DeviceResultPtr = NULL;
 			if (genSpec.resultDestination == ResultInCpuMemory) {

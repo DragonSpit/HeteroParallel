@@ -46,7 +46,8 @@ int CpuGenerateSortWork(SortToDo & sortSpec, const size_t & NumOfItemsInWorkQuan
 		(sortSpec.resultDestination == ResultInCpuMemory     || sortSpec.resultDestination == ResultInEachDevicesMemory ||	// TODO: Where the result is going should not even matter, as long as CPU is allowed to do work, it should do work
 		 sortSpec.resultDestination == ResultInCudaGpuMemory || sortSpec.resultDestination == ResultInOpenclGpuMemory)) {
 		//printf("First CPU work item\n");
-		workCPU.WorkerType    = ComputeEngine::CPU;
+		workCPU.TypeOfWork = Sort;
+		workCPU.ForWhichWorker = ComputeEngine::CPU;
 		workCPU.AmountOfWork  = NumOfItemsInWorkQuanta;
 		workCPU.HostSourcePtr = (char *)(&(sourceArray_CPU[sourceArrayIndex_CPU]));
 		workCPU.HostResultPtr = (char *)(&(resultArray_CPU[resultArrayIndex_CPU]));
@@ -74,7 +75,8 @@ int CudaGpuGenerateSortWork(SortToDo & sortSpec, const size_t & NumOfItemsInWork
 		 sortSpec.resultDestination == ResultInCudaGpuMemory || sortSpec.resultDestination == ResultInOpenclGpuMemory)) {
 		if ((resultArrayIndex_GPU + NumOfItemsInWorkQuanta) < sortSpec.CudaGPU.maxRandoms) {
 			//printf("First CudaGPU work item\n");
-			workCudaGPU.WorkerType      = ComputeEngine::CUDA_GPU;
+			workCPU.TypeOfWork = Sort;
+			workCudaGPU.ForWhichWorker  = ComputeEngine::CUDA_GPU;
 			workCudaGPU.AmountOfWork    = NumOfItemsInWorkQuanta;
 			workCudaGPU.DeviceSourcePtr = (char *)(&(sourceArray_GPU[sourceArrayIndex_GPU]));	// device memory is always used
 			workCudaGPU.DeviceResultPtr = (char *)(&(resultArray_GPU[resultArrayIndex_GPU]));
@@ -115,7 +117,8 @@ int OpenclGpuGenerateSortWork(SortToDo & sortSpec, const size_t & NumOfItemsInWo
 		 sortSpec.resultDestination == ResultInCudaGpuMemory || sortSpec.resultDestination == ResultInOpenclGpuMemory)) {
 		if ((resultArrayIndex_GPU + NumOfItemsInWorkQuanta) < sortSpec.OpenclGPU.maxRandoms) {
 			//printf("First OpenclGPU work item\n");
-			workOpenclGPU.WorkerType    = ComputeEngine::OPENCL_GPU;
+			workCPU.TypeOfWork = Sort;
+			workOpenclGPU.ForWhichWorker = ComputeEngine::OPENCL_GPU;
 			workOpenclGPU.AmountOfWork  = NumOfItemsInWorkQuanta;
 			workOpenclGPU.DeviceSourcePtr = (char *)(&(sourceArray_GPU[sourceArrayIndex_GPU]));	// device memory is always used
 			workOpenclGPU.DeviceResultPtr = (char *)(&(resultArray_GPU[resultArrayIndex_GPU]));
