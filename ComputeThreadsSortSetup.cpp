@@ -1,3 +1,4 @@
+#if 0
 #include <windows.h>
 #include <iostream>
 #include <fstream>
@@ -35,129 +36,10 @@ extern CudaMemoryEncapsulation		* gCudaResultMemory;		// TODO: Make sure to dele
 extern OpenClGpuRngEncapsulation    * gOpenClRngSupport;		// TODO: Make sure to delete it once done
 extern OpenClGpuMemoryEncapsulation	* gOpenClResultMemory;		// TODO: Make sure to delete it once done
 
+extern int loadBalancerCreateEventsAndThreads(void);
 extern int runLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, unsigned numTimes);
 
-HANDLE ghEventsComputeDone[NumComputeDoneEvents];	// 0 - CPU, 1 - CudaGpu, 2 - OpenClGpu, 3 - OpenClFpga
-bool   gRunComputeWorkers = true;
-
-int loadBalancerCreateEventsAndThreads(void)
-{
-	HANDLE hThread;
-	DWORD i, dwThreadID;
-
-	ghEventHaveWorkItemForCpu = CreateEvent(
-		NULL,   // default security attributes
-		FALSE,  // auto-reset event object
-		FALSE,  // initial state is nonsignaled
-		NULL);  // unnamed object
-
-	if (ghEventHaveWorkItemForCpu == NULL)
-	{
-		printf("CreateEvent error: %d\n", GetLastError());
-		return -2;
-	}
-	ghEventHaveWorkItemForCudaGpu = CreateEvent(
-		NULL,   // default security attributes
-		FALSE,  // auto-reset event object
-		FALSE,  // initial state is nonsignaled
-		NULL);  // unnamed object
-
-	if (ghEventHaveWorkItemForCudaGpu == NULL)
-	{
-		printf("CreateEvent error: %d\n", GetLastError());
-		return -2;
-	}
-	ghEventHaveWorkItemForOpenclGpu = CreateEvent(
-		NULL,   // default security attributes
-		FALSE,  // auto-reset event object
-		FALSE,  // initial state is nonsignaled
-		NULL);  // unnamed object
-
-	if (ghEventHaveWorkItemForOpenclGpu == NULL)
-	{
-		printf("CreateEvent error: %d\n", GetLastError());
-		return -2;
-	}
-
-	// Create all compute done event objects
-	for (i = 0; i < NumComputeDoneEvents; i++)
-	{
-		ghEventsComputeDone[i] = CreateEvent(
-			NULL,   // default security attributes
-			FALSE,  // auto-reset event object
-			FALSE,  // initial state is nonsignaled
-			NULL);  // unnamed object
-
-		if (ghEventsComputeDone[i] == NULL)
-		{
-			printf("CreateEvent error: %d\n", GetLastError());
-			return -1;
-		}
-	}
-
-	gRunComputeWorkers = true;
-	// TODO: Automate with an array of function pointers and an array of thread ID's that would be assigned by CreteThread
-	// Create MultiCoreCpuCompute thread (e.g. for MKL)
-	hThread = CreateThread(
-		NULL,         // default security attributes
-		0,            // default stack size
-		(LPTHREAD_START_ROUTINE)ThreadMultiCoreCpuCompute,
-		NULL,         // no thread function arguments
-		0,            // default creation flags
-		&dwThreadID); // receive thread identifier
-
-	if (hThread == NULL)
-	{
-		printf("CreateThread error: %d\n", GetLastError());
-		return -3;
-	}
-
-	// Create CudaGpu thread (e.g. for cuRAND)
-	hThread = CreateThread(
-		NULL,         // default security attributes
-		0,            // default stack size
-		(LPTHREAD_START_ROUTINE)ThreadCudaGpuCompute,
-		NULL,         // no thread function arguments
-		0,            // default creation flags
-		&dwThreadID); // receive thread identifier
-
-	if (hThread == NULL)
-	{
-		printf("CreateThread error: %d\n", GetLastError());
-		return -4;
-	}
-
-	// Create OpenclGpu thread for ArrayFire on Intel GPU
-	hThread = CreateThread(
-		NULL,         // default security attributes
-		0,            // default stack size
-		(LPTHREAD_START_ROUTINE)ThreadOpenclGpuCompute,
-		NULL,         // no thread function arguments
-		0,            // default creation flags
-		&dwThreadID); // receive thread identifier
-
-	if (hThread == NULL)
-	{
-		printf("CreateThread error: %d\n", GetLastError());
-		return -4;
-	}
-
-	return 0;
-}
-int loadBalancerDestroyEventsAndThreads(void)
-{
-	// TODO: Shut down all compute threads and wait for them to be done
-	gRunComputeWorkers = false;
-	// TODO: How do we shut down threads that are blocked waiting on work events? Maybe by creating null/zero/shutdown work item to let them know it's time to shutdown.
-
-	// Close event handles
-	CloseHandle(ghEventHaveWorkItemForCpu);
-	CloseHandle(ghEventHaveWorkItemForCudaGpu);
-	for (size_t i = 0; i < NumComputeDoneEvents; i++)
-		CloseHandle(ghEventsComputeDone[i]);
-
-	return 0;
-}
+extern bool   gRunComputeWorkers;
 
 // TODO: The last argument should be enum specifying whether to leave randoms in their respective memories for the next processing step to use them from there
 // TODO: or to copy them to system memory or to GPU memory (i.e. which memory should the result end up in)
@@ -176,7 +58,7 @@ int loadBalancerDestroyEventsAndThreads(void)
 // memory, this is 1/2 of what my system has, even if you have 32 GB of system memory, 8 GB of graphics memory is substantial percentage of overall memory.
 // Step #1: Let's just put the best benchmarks out of my blog and website and go from there.
 // Step #2: Work on other output options, such a single array in any memory, and an array of workItems in shared memory (i.e. no copy, but less convenient to use)
-int SelectAndRunLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, unsigned NumTimes)
+int SelectAndRunSortLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, unsigned NumTimes)
 {
 	if (genSpec.resultDestination == ResultInEachDevicesMemory)
 	{
@@ -209,29 +91,29 @@ int SelectAndRunLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchma
 	return 0;
 }
 
-void MemoryAllocatorCpu_GenRng(RandomsToGenerate& genSpec)
+void MemoryAllocatorCpu_Sort(SortToDo& sortSpec)
 {
 	// Determine how much CPU memory to allocate.
 	// TODO: We should only allocate as much CPU/System memory as will be actually used (as not all result may go into system memory)
 	// TODO: Only allocate system memory when we are going to put randoms into it
 	// TODO: Create CpuMemoryEncapsulation class, just like there is one for the GPU
-	if (genSpec.generated.CPU.Buffer == NULL) {
-		printf("Before allocation of NumOfBytesForRandomArray = %zd\n", genSpec.randomsToGenerate * sizeof(float));
-		float * randomFloatArray = new float[genSpec.randomsToGenerate];
+	if (sortSpec.Sorted.CPU.Buffer == NULL) {
+		printf("Before allocation of NumOfBytesForSortedArray = %zd\n", sortSpec.totalItemsToSort * sizeof(unsigned));
+		unsigned * sortedUnsignedArray = new float[sortSpec.totalItemsToSort];
 		// Clearing the arrays also pages them in (warming them up), which improves performance by 3X for the first generator due to first use
 		// TODO: reading one byte from each page is a faster way to warm up (page in) the array. I already have code for this.
-		memset((void *)randomFloatArray, 0, genSpec.randomsToGenerate * sizeof(float));
-		genSpec.generated.CPU.Buffer = (char *)randomFloatArray;
+		memset((void *)sortedUnsignedArray, 0, sortSpec.totalItemsToSort * sizeof(unsigned));
+		sortSpec.Sorted.CPU.Buffer = (char *)sortedUnsignedArray;
 	}
-	printf("After allocation of NumOfBytesForRandomArray = %zd at CPU memory location = %p\n", genSpec.randomsToGenerate * sizeof(float), genSpec.generated.CPU.Buffer);
+	printf("After allocation of NumOfBytesForSortedArray = %zd at CPU memory location = %p\n", sortSpec.totalItemsToSort * sizeof(unsigned), sortSpec.Sorted.CPU.Buffer);
 
-	if (genSpec.CPU.workQuanta == 0)
-		genSpec.CPU.workQuanta = 20 * 1024 * 1024;	// TODO: Need to define a global constant for this
+	if (sortSpec.CPU.workQuanta == 0)
+		sortSpec.CPU.workQuanta = 20 * 1024 * 1024;	// TODO: Need to define a global constant for this
 
-	printf("NumOfRandomsToGenerate = %zd, CPU.workQuanta = %zd\n", genSpec.randomsToGenerate, genSpec.CPU.workQuanta);
+	printf("NumOfRandomsToGenerate = %zd, CPU.workQuanta = %zd\n", sortSpec.totalItemsToSort, sortSpec.CPU.workQuanta);
 }
 
-int MemoryAllocatorCudaGpu_GenRng(RandomsToGenerate& genSpec)
+int MemoryAllocatorCudaGpu_Sort(RandomsToGenerate& genSpec)
 {
 	// Determine how much GPU memory to allocate
 	if (genSpec.CudaGPU.workQuanta == 0)
@@ -262,7 +144,7 @@ int MemoryAllocatorCudaGpu_GenRng(RandomsToGenerate& genSpec)
 	return 0;
 }
 
-int MemoryAllocatorOpenClGpu_GenRng(RandomsToGenerate& genSpec)
+int MemoryAllocatorOpenClGpu_Sort(RandomsToGenerate& genSpec)
 {
 	// Determine how much GPU memory to allocate
 	if (genSpec.OpenclGPU.workQuanta == 0)
@@ -285,6 +167,7 @@ int MemoryAllocatorOpenClGpu_GenRng(RandomsToGenerate& genSpec)
 	}
 	printf("Allocating OpenclGPU memory of %zd bytes\n", preallocateGPUmemorySize);
 
+	// CUDA memory allocation is extremely slow (seconds)!
 	gOpenClResultMemory = new OpenClGpuMemoryEncapsulation(preallocateGPUmemorySize);
 	genSpec.OpenclGPU.itemsAllocated = preallocateGPUmemorySize / genSpec.OpenclGPU.sizeOfItem;
 
@@ -293,25 +176,25 @@ int MemoryAllocatorOpenClGpu_GenRng(RandomsToGenerate& genSpec)
 }
 
 // TODO: pass in the sizeOf element
-int Validator(RandomsToGenerate& genSpec)
+int ValidatorSort(SortToDo& sortSpec)
 {
-	if (genSpec.CPU.memoryCapacity < (genSpec.CPU.maxRandoms * sizeof(float))) {
-		printf("Error: Maximum number of randoms for CPU memory exceeds memory capacity.\n");
+	if (sortSpec.CPU.memoryCapacity < (sortSpec.CPU.maxElements * sizeof(unsigned))) {
+		printf("Error: Maximum number of elements for CPU memory exceeds memory capacity.\n");
 		return -1;
 	}
-	if (genSpec.CudaGPU.memoryCapacity < (genSpec.CudaGPU.maxRandoms * sizeof(float))) {
-		printf("Error: Maximum number of randoms for CUDA GPU memory exceeds memory capacity.\n");
+	if (sortSpec.CudaGPU.memoryCapacity < (sortSpec.CudaGPU.maxElements * sizeof(unsigned))) {
+		printf("Error: Maximum number of elements for CUDA GPU memory exceeds memory capacity.\n");
 		return -2;
 	}
-	if (genSpec.OpenclGPU.memoryCapacity < (genSpec.OpenclGPU.maxRandoms * sizeof(float))) {
-		printf("Error: Maximum number of randoms for OpenCL GPU memory exceeds memory capacity.\n");
+	if (sortSpec.OpenclGPU.memoryCapacity < (sortSpec.OpenclGPU.maxElements * sizeof(unsigned))) {
+		printf("Error: Maximum number of elements for OpenCL GPU memory exceeds memory capacity.\n");
 		return -3;
 	}
 
 	return 0;
 }
 
-int benchmarkRngLoadBalancer()
+int benchmarkSortLoadBalancer()
 {
 	// TODO: Clean-up and split up cudaRand code into setup the PRNG function, memory allocation function and run several times function, to see how much CPU time the run function uses
 	// TODO: Then implement the idea of the global timer that everyone can use and start putting it everywhere to see where time is being spent, and order of operations
@@ -320,7 +203,7 @@ int benchmarkRngLoadBalancer()
 	string benchmarkFilename = "benchmarkResultsRng.txt";
 	ofstream benchmarkFile;
 	benchmarkFile.open(benchmarkFilename);
-	benchmarkFile << "Number of Randoms\t" << "Randoms per second" << endl;		// header for columns
+	benchmarkFile << "Number of Elements to Sort\t" << "Unsigned per second" << endl;		// header for columns
 
 	//broadcastNodeExample();
 
@@ -330,70 +213,69 @@ int benchmarkRngLoadBalancer()
 	int m_CudaDeviceID = findCudaDevice(argc, (const char **)argv);	// TODO: need to do this operation only once
 
 	// TODO: Needs to be part of CUDA GPU algorithms setup
-	unsigned long long prngSeed = 2;
-	gCudaRngSupport = new CudaRngEncapsulation(prngSeed);
+	//unsigned long long prngSeed = 2;
+	//gCudaRngSupport = new CudaRngEncapsulation(prngSeed);
 
 	// TODO: Needs to be part of OpenCL GPU setup, once at the beginning
 	af::setDevice(1);	// device 1 on my laptop is Intel 530 GPU
 	af::info();
 
-	gOpenClRngSupport = new OpenClGpuRngEncapsulation(prngSeed);
+	//gOpenClRngSupport = new OpenClGpuRngEncapsulation(prngSeed);
 
-	bool copyGPUresultsToSystemMemory = false;
-	RandomsToGenerate genSpec;
+	bool copyGPUresultsToSystemMemory = true;
+	SortToDo sortSpec;
 
-	size_t maxRandomsToGenerate = (size_t)400 * 1024 * 1024;
-	size_t minRandomsToGenerate = (size_t)380 * 1024 * 1024;
+	size_t maxNumberOfElementsToSort = (size_t)400 * 1024 * 1024;
+	size_t minNumberOfElementsToSort = (size_t)380 * 1024 * 1024;
 	unsigned NumTimes = 10;
 	// TODO: Seems to be a bug going down to 20M randoms - runs forever
 	// TODO: We also need to not be limited to the increment being of the same size as workQuanta
-	size_t randomsToGenerateIncrement = (size_t)20 * 1024 * 1024;	// workQuanta increment to make sure total work divides evenly until we can support it not
+	size_t elementsToSortIncrement = (size_t)20 * 1024 * 1024;	// workQuanta increment to make sure total work divides evenly until we can support it not
 
 																	// !! TODO: Create a structure of time stamp and string, to be able to create an array of time stamps and their identification with additional information
 																	// !! TODO: This will help debug where the delays are and help determine if the issue is in my code or in TBB itself, as we expect no iterference between cudaGPU and MKL
 																	// !! TODO: when the storage of randoms is in their respective local memories. The timestamp structure may have to be a global to avoid passing it into all layers of hierarchy.
-	genSpec.randomsToGenerate = maxRandomsToGenerate;
+	sortSpec.totalItemsToSort = maxNumberOfElementsToSort;
 	//genSpec.resultDestination = ResultInEachDevicesMemory;		// TODO: Eventually, we want this to be dynamic per work item for each worker to be adaptive to current conditions
-	genSpec.resultDestination = ResultInCpuMemory;					// TODO: Eventually, we want this to be dynamic per work item for each worker to be adaptive to current conditions
+	sortSpec.resultDestination = ResultInCpuMemory;					// TODO: Eventually, we want this to be dynamic per work item for each worker to be adaptive to current conditions
 
-	genSpec.CPU.workQuanta = 0;		// indicates user is ok with automatic determination
-	genSpec.CPU.memoryCapacity = (size_t)16 * 1024 * 1024 * 1024;
+	sortSpec.CPU.workQuanta = 0;		// indicates user is ok with automatic determination
+	sortSpec.CPU.memoryCapacity = (size_t)16 * 1024 * 1024 * 1024;
 	// TODO: That's all that should be specified - i.e. max percentage of device memory to be used
-	genSpec.CPU.sizeOfItem = sizeof(float);
-	genSpec.CPU.maxRandoms = (size_t)(genSpec.CPU.memoryCapacity * 0.50) / genSpec.CPU.sizeOfItem;	// use up to 50% of CPU memory for randoms
-	genSpec.CPU.allowedToWork = true;
-	genSpec.CPU.prngSeed = std::time(0);
+	sortSpec.CPU.sizeOfItem = sizeof(unsigned);
+	sortSpec.CPU.maxElements = (size_t)(sortSpec.CPU.memoryCapacity * 0.50) / sortSpec.CPU.sizeOfItem;	// use up to 50% of CPU memory for randoms
+	sortSpec.CPU.allowedToWork = true;
 
-	genSpec.CudaGPU.workQuanta = 0;		// indicates user is ok with automatic determination 
-	genSpec.CudaGPU.memoryCapacity = (size_t)2  * 1024 * 1024 * 1024;
+	sortSpec.CudaGPU.workQuanta = 0;		// indicates user is ok with automatic determination 
+	sortSpec.CudaGPU.memoryCapacity = (size_t)2  * 1024 * 1024 * 1024;
 	// TODO: That's all that should be specified - i.e. max percentage of device memory to be used
-	genSpec.CudaGPU.sizeOfItem = sizeof(float);
-	genSpec.CudaGPU.maxRandoms = (size_t)(genSpec.CudaGPU.memoryCapacity * 0.75) / genSpec.CudaGPU.sizeOfItem;	// use up to 75% of GPU memory for randoms
-	genSpec.CudaGPU.allowedToWork = true;
-	genSpec.CudaGPU.prngSeed = std::time(0) + 10;
+	sortSpec.CudaGPU.sizeOfItem = sizeof(unsigned);
+	sortSpec.CudaGPU.maxElements = (size_t)(sortSpec.CudaGPU.memoryCapacity * 0.75) / sortSpec.CudaGPU.sizeOfItem;	// use up to 75% of GPU memory for randoms
+	sortSpec.CudaGPU.allowedToWork = true;
 
-	genSpec.OpenclGPU.workQuanta = 0;		// indicates user is ok with automatic determination 
-	genSpec.OpenclGPU.memoryCapacity = (size_t)6 * 1024 * 1024 * 1024;
+	sortSpec.OpenclGPU.workQuanta = 0;		// indicates user is ok with automatic determination 
+	sortSpec.OpenclGPU.memoryCapacity = (size_t)6 * 1024 * 1024 * 1024;
 	// TODO: That's all that should be specified - i.e. max percentage of device memory to be used
-	genSpec.OpenclGPU.sizeOfItem = sizeof(float);
-	genSpec.OpenclGPU.maxRandoms = (size_t)(genSpec.OpenclGPU.memoryCapacity * 0.75) / genSpec.OpenclGPU.sizeOfItem;	// use up to 75% of GPU memory for randoms
-	genSpec.OpenclGPU.allowedToWork = true;
-	genSpec.OpenclGPU.prngSeed = std::time(0) + 10;
+	sortSpec.OpenclGPU.sizeOfItem = sizeof(unsigned);
+	sortSpec.OpenclGPU.maxElements = (size_t)(sortSpec.OpenclGPU.memoryCapacity * 0.75) / sortSpec.OpenclGPU.sizeOfItem;	// use up to 75% of GPU memory for randoms
+	sortSpec.OpenclGPU.allowedToWork = true;
 
-	genSpec.generated.CPU.Buffer = NULL;		// NULL implies the generator is to allocate memory. non-NULL implies reuse the buffer provided
-	genSpec.generated.CPU.Length = 0;
-	genSpec.generated.CudaGPU.Buffer = NULL;	// NULL implies the generator is to allocate memory. non-NULL implies reuse the buffer provided
-	genSpec.generated.CudaGPU.Length = 0;
-	printf("genSpec set\n");
+	sortSpec.Sorted.CPU.Buffer = NULL;			// NULL implies the generator is to allocate memory. non-NULL implies reuse the buffer provided
+	sortSpec.Sorted.CPU.Length = 0;
+	sortSpec.Sorted.CudaGPU.Buffer = NULL;		// NULL implies the generator is to allocate memory. non-NULL implies reuse the buffer provided
+	sortSpec.Sorted.CudaGPU.Length = 0;
+	sortSpec.Sorted.OpenclGPU.Buffer = NULL;	// NULL implies the generator is to allocate memory. non-NULL implies reuse the buffer provided
+	sortSpec.Sorted.OpenclGPU.Length = 0;
+	printf("sortSpec set\n");
 
-	if (Validator(genSpec) != 0)
+	if (ValidatorSort(sortSpec) != 0)
 		return -1;
 
-	MemoryAllocatorCpu_GenRng(genSpec);
+	MemoryAllocatorCpu_Sort(sortSpec);
 
-	MemoryAllocatorCudaGpu_GenRng(genSpec);
+	MemoryAllocatorCudaGpu_Sort(sortSpec);
 
-	MemoryAllocatorOpenClGpu_GenRng(genSpec);
+	MemoryAllocatorOpenClGpu_Sort(sortSpec);
 
 	loadBalancerCreateEventsAndThreads();
 
@@ -403,7 +285,7 @@ int benchmarkRngLoadBalancer()
 	// TODO: Run over all cudaRand type of generators to provide performance numbers for all of them
 
 	// Start at maximum size of array of randoms to generate, so that we can re-use the allocated array on the first iteration, since the rest of iteration will generate fewer randoms and will fit into the largest array
-	for (size_t randomsToGenerate = maxRandomsToGenerate; randomsToGenerate >= minRandomsToGenerate; randomsToGenerate -= randomsToGenerateIncrement)
+	for (size_t randomsToGenerate = maxNumberOfElementsToSort; randomsToGenerate >= minNumberOfElementsToSort; randomsToGenerate -= randomsToGenerateIncrement)
 	{
 		genSpec.randomsToGenerate = randomsToGenerate;
 		// TODO: The two use cases I'm going to work on are:
@@ -447,3 +329,4 @@ int benchmarkRngLoadBalancer()
 
 	return 0;
 }
+#endif

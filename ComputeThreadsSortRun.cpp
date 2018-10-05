@@ -1,4 +1,4 @@
-#if 0
+#if 1
 #include <windows.h>
 #include <iostream>
 #include <fstream>
@@ -73,7 +73,7 @@ int CudaGpuGenerateSortWork(SortToDo & sortSpec, const size_t & NumOfItemsInWork
 	if (sortSpec.CudaGPU.allowedToWork &&
 		(sortSpec.resultDestination == ResultInCpuMemory     || sortSpec.resultDestination == ResultInEachDevicesMemory ||	// TODO: Where the result is going should not even matter, as long as CudaGpu is allowed to do work, it should do work
 		 sortSpec.resultDestination == ResultInCudaGpuMemory || sortSpec.resultDestination == ResultInOpenclGpuMemory)) {
-		if ((resultArrayIndex_GPU + NumOfItemsInWorkQuanta) < sortSpec.CudaGPU.maxRandoms) {
+		if ((resultArrayIndex_GPU + NumOfItemsInWorkQuanta) < sortSpec.CudaGPU.maxElements) {
 			//printf("First CudaGPU work item\n");
 			workCPU.TypeOfWork = Sort;
 			workCudaGPU.ForWhichWorker  = ComputeEngine::CUDA_GPU;
@@ -115,13 +115,13 @@ int OpenclGpuGenerateSortWork(SortToDo & sortSpec, const size_t & NumOfItemsInWo
 	if (sortSpec.OpenclGPU.allowedToWork &&
 		(sortSpec.resultDestination == ResultInCpuMemory     || sortSpec.resultDestination == ResultInEachDevicesMemory ||	// TODO: Where the result is going should not even matter, as long as CudaGpu is allowed to do work, it should do work
 		 sortSpec.resultDestination == ResultInCudaGpuMemory || sortSpec.resultDestination == ResultInOpenclGpuMemory)) {
-		if ((resultArrayIndex_GPU + NumOfItemsInWorkQuanta) < sortSpec.OpenclGPU.maxRandoms) {
+		if ((resultArrayIndex_GPU + NumOfItemsInWorkQuanta) < sortSpec.OpenclGPU.maxElements) {
 			//printf("First OpenclGPU work item\n");
 			workCPU.TypeOfWork = Sort;
 			workOpenclGPU.ForWhichWorker = ComputeEngine::OPENCL_GPU;
 			workOpenclGPU.AmountOfWork  = NumOfItemsInWorkQuanta;
-			workOpenclGPU.DeviceSourcePtr = (char *)(&(sourceArray_GPU[sourceArrayIndex_GPU]));	// device memory is always used
-			workOpenclGPU.DeviceResultPtr = (char *)(&(resultArray_GPU[resultArrayIndex_GPU]));
+			//workOpenclGPU.DeviceSourcePtr = (char *)(&(sourceArray_GPU[sourceArrayIndex_GPU]));	// device memory is always used
+			//workOpenclGPU.DeviceResultPtr = (char *)(&(resultArray_GPU[resultArrayIndex_GPU]));
 			if (sourceArray_CPU != NULL) {
 				workOpenclGPU.HostSourcePtr = (char *)(&(sourceArray_CPU[sourceArrayIndex_CPU]));
 				sourceArrayIndex_CPU += NumOfItemsInWorkQuanta;		// TODO: Figure out how to handle different size workQuanta between CPU and GPU and knowing when work is done
@@ -162,16 +162,16 @@ int runLoadBalancerSortThread(SortToDo& sortSpec, ofstream& benchmarkFile, unsig
 	// TODO: Currently, this is static, but eventually should be dynamic (within the work generation loop) as work quanta will be different for each computational unit and may even be dynamically sized
 	size_t NumOfWorkItems = NumOfWorkItems = NumOfItemsToSort / NumOfItemsInWorkQuanta;
 	if (sortSpec.resultDestination == ResultInCudaGpuMemory && !sortSpec.CPU.allowedToWork && !sortSpec.OpenclGPU.allowedToWork && !sortSpec.FpgaGPU.allowedToWork)	// only CudaGPU is working
-		NumOfWorkItems = __min(sortSpec.CudaGPU.maxRandoms, NumOfItemsToSort) / sortSpec.CudaGPU.workQuanta;
+		NumOfWorkItems = __min(sortSpec.CudaGPU.maxElements, NumOfItemsToSort) / sortSpec.CudaGPU.workQuanta;
 	else if (sortSpec.resultDestination == ResultInCpuMemory)
 		NumOfWorkItems = NumOfWorkItems = NumOfItemsToSort / NumOfItemsInWorkQuanta;
 
 	//TODO: need source device memory!
 	unsigned long *sourceUnsortedArray_CudaGPU = (unsigned long *)gCudaSourceMemory->m_gpu_memory;
 	unsigned long *resultSortedArray_CudaGPU   = (unsigned long *)gCudaResultMemory->m_gpu_memory;
-	// TODO: OpenCL memory for now needs to be host memory, as we are getting sorting to work from host to host memory first
-	//unsigned long *sourceUnsortedArray_OpenClGPU = (unsigned long *)gOpenClSourceMemory->m_gpu_memory;
-	//unsigned long *resultSortedArray_OpenClGPU   = (unsigned long *)gOpenClResultMemory->m_gpu_memory;
+	// TODO: OpenCL memory for now needs to be host memory, as we are getting sorting to work from host to host memory first. Plus, ArrayFire has it's own array data type in GPU memory instead of using host mapped memory
+	unsigned long *sourceUnsortedArray_OpenClGPU = NULL;
+	unsigned long *resultSortedArray_OpenClGPU   = NULL;
 	unsigned long *sourceUnsortedArray_CPU     = (unsigned long *)sortSpec.Unsorted.CPU.Buffer;
 	unsigned long *resultSortedArray_CPU       = (unsigned long *)sortSpec.Sorted.CPU.Buffer;
 

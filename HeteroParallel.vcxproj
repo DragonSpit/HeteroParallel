@@ -117,6 +117,7 @@
     <ClCompile Include="ComputeThreadsRngRun.cpp" />
     <ClCompile Include="ComputeThreadsRngSetup.cpp" />
     <ClCompile Include="ComputeThreadsSortRun.cpp" />
+    <ClCompile Include="ComputeThreadsSortSetup.cpp" />
     <ClCompile Include="flowGraphExamples.cpp" />
     <ClCompile Include="OpenClHelloWorld.cpp" />
     <ClCompile Include="OpenClSecondExample.cpp" />

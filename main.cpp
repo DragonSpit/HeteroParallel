@@ -70,7 +70,7 @@ extern void broadcastNodeExample();
 extern int indexerNodeExample();
 extern int indexerNodeExampleWithOutputAndQueue();
 extern int mainThread(void);
-extern int benchmarkLoadBalancer(void);
+extern int benchmarkRngLoadBalancer(void);
 extern int openClHelloWorld();
 extern int secondOnenClExample(void);
 extern int clRngExample(void);
@@ -147,7 +147,7 @@ int
 wmain(int argc, char **argv)
 {
 	//mainThread();
-	benchmarkLoadBalancer();	// CPU and Cuda GPU RNG
+	benchmarkRngLoadBalancer();	// CPU and Cuda GPU RNG
 	//myMainSort(argc, argv);
 
 	//openClHelloWorld();
