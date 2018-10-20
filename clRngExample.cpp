@@ -26,7 +26,7 @@ int openClAttributes(cl_device_id * devices, cl_uint& num_devices, cl_platform_i
 	err = clGetPlatformIDs(max_num_platforms, platforms, &num_platforms);
 
 	printf("=== %d OpenCL platform(s) found: ===\n", num_platforms);
-	for (int i = 0; i<num_platforms; i++)
+	for (unsigned i = 0; i<num_platforms; i++)
 	{
 		char buffer[10240];
 		printf("  -- %d --\n", i);
@@ -48,7 +48,7 @@ int openClAttributes(cl_device_id * devices, cl_uint& num_devices, cl_platform_i
 	err = clGetDeviceIDs(platforms[0], CL_DEVICE_TYPE_GPU, 1, devices, &num_devices);
 
 	printf("%u OpenCL device(s) found on platform\n", num_devices);
-	for (int i = 0; i < num_devices; i++)
+	for (unsigned i = 0; i < num_devices; i++)
 	{
 		char buffer[10240];
 		cl_uint buf_uint;

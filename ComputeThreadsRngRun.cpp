@@ -131,7 +131,7 @@ int OpenclGpuGenerateWork(RandomsToGenerate & genSpec, const size_t & NumOfRando
 
 // TODO: Capture the pattern of load balancing any algorithm, possibly using a template to load balance anything.
 // numTimes is needed to see if running the first time is slower than running subsequent times, as this is commonly the case due to OS paging and CPU caching
-int runLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, unsigned numTimes)
+int runLoadBalancerRngThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, unsigned numTimes)
 {
 	size_t NumOfRandomsToGenerate = genSpec.randomsToGenerate;
 	size_t NumOfRandomsInWorkQuanta = genSpec.CPU.workQuanta;		// TODO: Need to separate CPU and GPU workQuanta, and handle them being different

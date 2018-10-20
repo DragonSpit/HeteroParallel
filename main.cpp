@@ -1,19 +1,9 @@
-/*
- * Copyright 1993-2015 NVIDIA Corporation.  All rights reserved.
- *
- * Please refer to the NVIDIA end user license agreement (EULA) associated
- * with this source code for terms and conditions that govern your use of
- * this software. Any use, reproduction, disclosure, or distribution of
- * this software and related documentation outside the terms of the EULA
- * is strictly prohibited.
- *
- */
-
-/* Example of integrating CUDA functions into an existing
- * application / framework.
- * CPP code representing the existing application / framework.
- * Compiled with default CPP compiler.
- */
+// TODO: Separate the load balancer itself into a separate piece and abstract it well to have a simple interface where the user provides work items into a queue
+//       as there is room in the queue and the queue depth can be specified. At first, we may need a queue for each type of worker, and as we mature aspire to have
+//       a single queue. It's ok to start the interface with a single item for each compute engine (worker) as we have it now, and progress toward better interface.
+//       Single queue may be problematic, as a worker can get stuck behind others not completing their work fast enough and the faster worker not being able to get
+//       new work items out of the queue. It may be better to have a queue for each worker type, or be able to find a work item for a particular worker, unless all
+//       work items are such that any worker can complete them.
 
 #define TBB_PREVIEW_FLOW_GRAPH_FEATURES 1
 #include "tbb/tbb_config.h"

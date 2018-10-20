@@ -1,4 +1,3 @@
-#if 0
 #include <windows.h>
 #include <iostream>
 #include <fstream>
@@ -37,7 +36,9 @@ extern OpenClGpuRngEncapsulation    * gOpenClRngSupport;		// TODO: Make sure to 
 extern OpenClGpuMemoryEncapsulation	* gOpenClResultMemory;		// TODO: Make sure to delete it once done
 
 extern int loadBalancerCreateEventsAndThreads(void);
-extern int runLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, unsigned numTimes);
+extern int loadBalancerDestroyEventsAndThreads(void);
+
+extern int runLoadBalancerSortThread(SortToDo& sortSpec, ofstream& benchmarkFile, unsigned numTimes);
 
 extern bool   gRunComputeWorkers;
 
@@ -58,34 +59,34 @@ extern bool   gRunComputeWorkers;
 // memory, this is 1/2 of what my system has, even if you have 32 GB of system memory, 8 GB of graphics memory is substantial percentage of overall memory.
 // Step #1: Let's just put the best benchmarks out of my blog and website and go from there.
 // Step #2: Work on other output options, such a single array in any memory, and an array of workItems in shared memory (i.e. no copy, but less convenient to use)
-int SelectAndRunSortLoadBalancerThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile, unsigned NumTimes)
+int SelectAndRunSortLoadBalancerThread(SortToDo& sortSpec, ofstream& benchmarkFile, unsigned NumTimes)
 {
-	if (genSpec.resultDestination == ResultInEachDevicesMemory)
+	if (sortSpec.resultDestination == ResultInEachDevicesMemory)
 	{
 		printf("SelectAndRunLoadBalancerThread with ResultInEachDevicesMemory\n");
 		// TODO: Need to return an address, number of randoms returned and the size of memory allocated.
 		// TODO: Need to NOT free that memory and make it the responsibility of the user, but provide an interface to de-allocate thru for each device.
-		return runLoadBalancerThread(genSpec, benchmarkFile, NumTimes);
+		return runLoadBalancerSortThread(sortSpec, benchmarkFile, NumTimes);
 	}
-	else if (genSpec.resultDestination == ResultInCudaGpuMemory)
+	else if (sortSpec.resultDestination == ResultInCudaGpuMemory)
 	{
 		printf("SelectAndRunLoadBalancerThread with ResultInCudaGPUMemory\n");
 		// TODO: Need to return an address, number of randoms returned and the size of memory allocated.
 		// TODO: Need to NOT free that memory and make it the responsibility of the user, but provide an interface to de-allocate thru for each device.
-		runLoadBalancerThread(genSpec, benchmarkFile, NumTimes);
-		genSpec.generated.CPU.Length = 0;
+		runLoadBalancerSortThread(sortSpec, benchmarkFile, NumTimes);
+		sortSpec.Sorted.CPU.Length = 0;
 	}
-	else if (genSpec.resultDestination == ResultInCpuMemory)
+	else if (sortSpec.resultDestination == ResultInCpuMemory)
 	{
 		// TODO: Need to not free that memory and make it the responsibility of the user, but provide an interface to de-allocate thru for each device.
 		// TODO: GPU generated memory allocation needs to be different than for non-copy case, to handle each workItem and to copy the result of each workItem
 		// TODO: In this way we can handle way bigger array and need to fail it if workItem's worth of randoms don't fit into GPU memory
-		if (genSpec.CudaGPU.allowedToWork && genSpec.CudaGPU.workQuanta > genSpec.CudaGPU.memoryCapacity)
+		if (sortSpec.CudaGPU.allowedToWork && sortSpec.CudaGPU.workQuanta > sortSpec.CudaGPU.memoryCapacity)
 			return -3;		// TODO: Define error return codes in the .h file we provide to the users
 
-		runLoadBalancerThread(genSpec, benchmarkFile, NumTimes);
-		genSpec.generated.CudaGPU.Buffer = NULL;
-		genSpec.generated.CudaGPU.Length = 0;
+		runLoadBalancerSortThread(sortSpec, benchmarkFile, NumTimes);
+		sortSpec.Sorted.CudaGPU.Buffer = NULL;
+		sortSpec.Sorted.CudaGPU.Length = 0;
 	}
 
 	return 0;
@@ -98,95 +99,96 @@ void MemoryAllocatorCpu_Sort(SortToDo& sortSpec)
 	// TODO: Only allocate system memory when we are going to put randoms into it
 	// TODO: Create CpuMemoryEncapsulation class, just like there is one for the GPU
 	if (sortSpec.Sorted.CPU.Buffer == NULL) {
-		printf("Before allocation of NumOfBytesForSortedArray = %zd\n", sortSpec.totalItemsToSort * sizeof(unsigned));
-		unsigned * sortedUnsignedArray = new float[sortSpec.totalItemsToSort];
+		printf("Before allocation of sortSpec.totalItemsToSort = %zd\n", sortSpec.totalItemsToSort * sizeof(unsigned));
+		unsigned * sortedUnsignedArray = new unsigned[sortSpec.totalItemsToSort];
 		// Clearing the arrays also pages them in (warming them up), which improves performance by 3X for the first generator due to first use
 		// TODO: reading one byte from each page is a faster way to warm up (page in) the array. I already have code for this.
 		memset((void *)sortedUnsignedArray, 0, sortSpec.totalItemsToSort * sizeof(unsigned));
 		sortSpec.Sorted.CPU.Buffer = (char *)sortedUnsignedArray;
+		sortSpec.Sorted.CPU.Length = sortSpec.totalItemsToSort * sizeof(unsigned);
 	}
-	printf("After allocation of NumOfBytesForSortedArray = %zd at CPU memory location = %p\n", sortSpec.totalItemsToSort * sizeof(unsigned), sortSpec.Sorted.CPU.Buffer);
+	printf("After allocation of sortSpec.totalItemsToSort = %zd at CPU memory location = %p\n", sortSpec.totalItemsToSort * sizeof(unsigned), sortSpec.Sorted.CPU.Buffer);
 
+	// TODO: This code needs not be in a memory allocation routine
 	if (sortSpec.CPU.workQuanta == 0)
 		sortSpec.CPU.workQuanta = 20 * 1024 * 1024;	// TODO: Need to define a global constant for this
 
 	printf("NumOfRandomsToGenerate = %zd, CPU.workQuanta = %zd\n", sortSpec.totalItemsToSort, sortSpec.CPU.workQuanta);
 }
 
-int MemoryAllocatorCudaGpu_Sort(RandomsToGenerate& genSpec)
+int MemoryAllocatorCudaGpu_Sort(SortToDo& sortSpec)
 {
 	// Determine how much GPU memory to allocate
-	if (genSpec.CudaGPU.workQuanta == 0)
-		genSpec.CudaGPU.workQuanta = 20 * 1024 * 1024;	// TODO: Need to define a global constant for this
+	if (sortSpec.CudaGPU.workQuanta == 0)
+		sortSpec.CudaGPU.workQuanta = 20 * 1024 * 1024;	// TODO: Need to define a global constant for this
 														// TODO: Develop a way to determine optimal work chunk size, possibly dynamically or during install on that machine, or over many runs get to better and better performance
 	//size_t NumOfRandomsInWorkQuanta = genSpec.CudaGPU.workQuanta;	// TODO: Need to separate CPU and GPU workQuanta, and handle them being different
 																	// TODO: Fix the problem with the case of asking the CudaGPU to generate more randoms that can fit into it's memory, but no other computational units are helping to generate more
 																	// TODO: One possible way to do this is to pre-determine the NumOfWorkItems and shrink it in case there is not enough memory between all of the generators
 																	// TODO: Another way is to create a method that takes genSpec as input and outputs all of the needed setup variables with their values for the rest of the code to use
 	size_t preallocateGPUmemorySize;
-	if (genSpec.resultDestination == ResultInCpuMemory && genSpec.CudaGPU.allowedToWork)
-		preallocateGPUmemorySize = genSpec.CudaGPU.workQuanta * genSpec.CudaGPU.sizeOfItem;	// when GPU is a helper, only pre-allocate workQuanta size in GPU memory and use the same memory buffer for each work item
-	else if (!genSpec.CudaGPU.allowedToWork)
+	if (!sortSpec.CudaGPU.allowedToWork)
 		preallocateGPUmemorySize = 0;
-	else if (genSpec.CudaGPU.allowedToWork)
-		preallocateGPUmemorySize = genSpec.CudaGPU.maxRandoms * genSpec.CudaGPU.sizeOfItem;
 	else {
-		printf("Error: Unsupported configuration\n");
-		return -1;
+		if (sortSpec.resultDestination == ResultInCpuMemory)
+			preallocateGPUmemorySize = sortSpec.CudaGPU.workQuanta * sortSpec.CudaGPU.sizeOfItem;	// when GPU is a helper, only pre-allocate workQuanta size in GPU memory and use the same memory buffer for each work item
+		else {
+			printf("Error: Unsupported configuration sort Cuda GPU\n");
+			exit(-1);
+		}
 	}
-	printf("Allocating CudaGPU memory of %zd bytes\n", preallocateGPUmemorySize);
+	printf("Allocating CudaGPU memory of %zd bytes, each item size = %zd\n", preallocateGPUmemorySize, sortSpec.CudaGPU.sizeOfItem);
 
 	// CUDA memory allocation is extremely slow (seconds)!
 	gCudaResultMemory = new CudaMemoryEncapsulation(preallocateGPUmemorySize);
-	genSpec.CudaGPU.itemsAllocated = preallocateGPUmemorySize / genSpec.CudaGPU.sizeOfItem;
+	sortSpec.CudaGPU.itemsAllocated = preallocateGPUmemorySize / sortSpec.CudaGPU.sizeOfItem;
 
-	printf("NumOfRandomsToGenerate = %zd, GPU.workQuanta = %zd\n", genSpec.randomsToGenerate, genSpec.CudaGPU.workQuanta);
+	printf("Cuda GPU number of sort items allocated = %zd, GPU.workQuanta = %zd\n", sortSpec.CudaGPU.itemsAllocated, sortSpec.CudaGPU.workQuanta);
 	return 0;
 }
 
-int MemoryAllocatorOpenClGpu_Sort(RandomsToGenerate& genSpec)
+int MemoryAllocatorOpenClGpu_Sort(SortToDo& sortSpec)
 {
 	// Determine how much GPU memory to allocate
-	if (genSpec.OpenclGPU.workQuanta == 0)
-		genSpec.OpenclGPU.workQuanta = 20 * 1024 * 1024;	// TODO: Need to define a global constant for this
+	if (sortSpec.OpenclGPU.workQuanta == 0)
+		sortSpec.OpenclGPU.workQuanta = 20 * 1024 * 1024;	// TODO: Need to define a global constant for this
 														// TODO: Develop a way to determine optimal work chunk size, possibly dynamically or during install on that machine, or over many runs get to better and better performance
 														//size_t NumOfRandomsInWorkQuanta = genSpec.CudaGPU.workQuanta;	// TODO: Need to separate CPU and GPU workQuanta, and handle them being different
 														// TODO: Fix the problem with the case of asking the CudaGPU to generate more randoms that can fit into it's memory, but no other computational units are helping to generate more
 														// TODO: One possible way to do this is to pre-determine the NumOfWorkItems and shrink it in case there is not enough memory between all of the generators
 														// TODO: Another way is to create a method that takes genSpec as input and outputs all of the needed setup variables with their values for the rest of the code to use
 	size_t preallocateGPUmemorySize;
-	if (genSpec.resultDestination == ResultInCpuMemory && genSpec.OpenclGPU.allowedToWork)
-		preallocateGPUmemorySize = genSpec.OpenclGPU.workQuanta * genSpec.OpenclGPU.sizeOfItem;	// when GPU is a helper, only pre-allocate workQuanta size in GPU memory and use the same memory buffer for each work item
-	else if (!genSpec.OpenclGPU.allowedToWork)
+	if (!sortSpec.OpenclGPU.allowedToWork)
 		preallocateGPUmemorySize = 0;
-	else if (genSpec.OpenclGPU.allowedToWork)
-		preallocateGPUmemorySize = genSpec.OpenclGPU.maxRandoms * genSpec.OpenclGPU.sizeOfItem;
 	else {
-		printf("Error: Unsupported configuration\n");
-		return -1;
+		if (sortSpec.resultDestination == ResultInCpuMemory)
+			preallocateGPUmemorySize = sortSpec.OpenclGPU.workQuanta * sortSpec.OpenclGPU.sizeOfItem;	// when GPU is a helper, only pre-allocate workQuanta size in GPU memory and use the same memory buffer for each work item
+		else {
+			printf("Error: Unsupported configuration sort OpenCL GPU\n");
+			exit(-1);
+		}
 	}
-	printf("Allocating OpenclGPU memory of %zd bytes\n", preallocateGPUmemorySize);
+	printf("Allocating OpenclGPU memory of %zd bytes, each item size = %zd\n", preallocateGPUmemorySize, sortSpec.OpenclGPU.sizeOfItem);
 
 	// CUDA memory allocation is extremely slow (seconds)!
 	gOpenClResultMemory = new OpenClGpuMemoryEncapsulation(preallocateGPUmemorySize);
-	genSpec.OpenclGPU.itemsAllocated = preallocateGPUmemorySize / genSpec.OpenclGPU.sizeOfItem;
+	sortSpec.OpenclGPU.itemsAllocated = preallocateGPUmemorySize / sortSpec.OpenclGPU.sizeOfItem;
 
-	printf("NumOfRandomsToGenerate = %zd, OpenclGPU.workQuanta = %zd\n", genSpec.randomsToGenerate, genSpec.OpenclGPU.workQuanta);
+	printf("OpenCL GPU number of sort items allocated = %zd, OpenclGPU.workQuanta = %zd\n", sortSpec.OpenclGPU.itemsAllocated, sortSpec.OpenclGPU.workQuanta);
 	return 0;
 }
 
-// TODO: pass in the sizeOf element
 int ValidatorSort(SortToDo& sortSpec)
 {
-	if (sortSpec.CPU.memoryCapacity < (sortSpec.CPU.maxElements * sizeof(unsigned))) {
+	if (sortSpec.CPU.memoryCapacity < (sortSpec.CPU.maxElements * sortSpec.CPU.sizeOfItem)) {
 		printf("Error: Maximum number of elements for CPU memory exceeds memory capacity.\n");
 		return -1;
 	}
-	if (sortSpec.CudaGPU.memoryCapacity < (sortSpec.CudaGPU.maxElements * sizeof(unsigned))) {
+	if (sortSpec.CudaGPU.memoryCapacity < (sortSpec.CudaGPU.maxElements * sortSpec.CudaGPU.sizeOfItem)) {
 		printf("Error: Maximum number of elements for CUDA GPU memory exceeds memory capacity.\n");
 		return -2;
 	}
-	if (sortSpec.OpenclGPU.memoryCapacity < (sortSpec.OpenclGPU.maxElements * sizeof(unsigned))) {
+	if (sortSpec.OpenclGPU.memoryCapacity < (sortSpec.OpenclGPU.maxElements * sortSpec.OpenclGPU.sizeOfItem)) {
 		printf("Error: Maximum number of elements for OpenCL GPU memory exceeds memory capacity.\n");
 		return -3;
 	}
@@ -285,9 +287,9 @@ int benchmarkSortLoadBalancer()
 	// TODO: Run over all cudaRand type of generators to provide performance numbers for all of them
 
 	// Start at maximum size of array of randoms to generate, so that we can re-use the allocated array on the first iteration, since the rest of iteration will generate fewer randoms and will fit into the largest array
-	for (size_t randomsToGenerate = maxNumberOfElementsToSort; randomsToGenerate >= minNumberOfElementsToSort; randomsToGenerate -= randomsToGenerateIncrement)
+	for (size_t elementsToSort = maxNumberOfElementsToSort; elementsToSort >= minNumberOfElementsToSort; elementsToSort -= elementsToSortIncrement)
 	{
-		genSpec.randomsToGenerate = randomsToGenerate;
+		sortSpec.totalItemsToSort = elementsToSort;
 		// TODO: The two use cases I'm going to work on are:
 		// TODO: 1. Generate a requested number of random numbers in system memory with the help of all computational units (multi-core CPU, CUDA GPU(s), OpenCL GPU(s), OpenCL FPGA(s)
 		// TODO: 2. Generate a requested number of random numbers in variety of memories. The user will need to specify memory capacity of each computational unit (for now)
@@ -315,18 +317,17 @@ int benchmarkSortLoadBalancer()
 		// TODO: Create a UWP application service for high performance and accelerated algorithms, providing LSD Radix Sort, CudaRand algorithms, MKL algorithms, to make them available to C# and other UWP applications. Sadly, transfer of data runs at about 30MBytes/sec, which is way too slow. In-process UWP application service should perform well enough
 
 		auto elapsed = time_call([&] {
-			SelectAndRunLoadBalancerThread(genSpec, benchmarkFile, NumTimes);
+			SelectAndRunSortLoadBalancerThread(sortSpec, benchmarkFile, NumTimes);
 		});
-		printf("SelectAndRunLoadBalancerThread ran at an overall rate of %zd floats/second\n", (size_t)((double)genSpec.randomsToGenerate / (elapsed / 1000.0)));
+		printf("SelectAndRunSortLoadBalancerThread ran at an overall rate of %zd unsigned/second\n", (size_t)((double)sortSpec.totalItemsToSort / (elapsed / 1000.0)));
 	}
 
 	loadBalancerDestroyEventsAndThreads();
 
-	delete[] genSpec.generated.CPU.Buffer;
+	delete[] sortSpec.Sorted.CPU.Buffer;
 	delete gCudaResultMemory;
 
 	benchmarkFile.close();
 
 	return 0;
 }
-#endif
