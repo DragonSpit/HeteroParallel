@@ -51,8 +51,15 @@ DWORD WINAPI ThreadCudaGpuCompute(LPVOID lpParam)
 		}
 
 		//Sleep(2000);	// for debug, to slow GPU down artificially for each work item
-		bool verify = false;
-		GenerateRandFloatCuda((float *)workCudaGPU.DeviceResultPtr, (float *)workCudaGPU.HostResultPtr, gCudaRngSupport->prngGPU, workCudaGPU.AmountOfWork, verify, gCudaRngSupport->prngCPU);
+		switch (workCudaGPU.TypeOfWork)
+		{
+		case GenerateRandoms:
+			GenerateRandFloatCuda((float *)workCudaGPU.DeviceResultPtr, (float *)workCudaGPU.HostResultPtr, gCudaRngSupport->prngGPU, workCudaGPU.AmountOfWork, false, gCudaRngSupport->prngCPU);
+			break;
+		case Sort:
+			printf("Cuda GPU compute thread: performing Sort type of work (not implemented yet)\n");
+			break;
+		}
 
 		// Signal the associated event to indicate work item has been finished
 		//printf("ThreadCudaGpuCompute %d done with work item. Signaling dispatcher\n", GetCurrentThreadId());

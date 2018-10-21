@@ -138,8 +138,8 @@ int
 wmain(int argc, char **argv)
 {
 	//mainThread();
-	benchmarkRngLoadBalancer();		// RNG     by Multi-core CPU, Cuda GPU, and OpenCL GPU
-	//benchmarkSortLoadBalancer();	// Sorting by Multi-core CPU, Cuda GPU, and OpenCL GPU
+	//benchmarkRngLoadBalancer();		// RNG     by Multi-core CPU, Cuda GPU, and OpenCL GPU
+	benchmarkSortLoadBalancer();	// Sorting by Multi-core CPU, Cuda GPU, and OpenCL GPU
 	//myMainSort(argc, argv);
 	//openClHelloWorld();
 	//secondOnenClExample();

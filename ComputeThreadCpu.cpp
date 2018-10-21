@@ -12,6 +12,7 @@
 #include "asyncNodeGenerator.h"
 #include "CudaSupport.h"
 #include "TimerCycleAccurateArray.h"
+#include "ParallelMergeSort.h"
 
 using namespace std;
 
@@ -59,7 +60,8 @@ DWORD WINAPI ThreadMultiCoreCpuCompute(LPVOID lpParam)
 			break;
 		case Sort:
 			{
-			printf("CPU compute thread: performing Sort type of work (not implemented yet)\n");
+				printf("CPU compute thread: performing Sort type of work\n");
+				parallel_merge_sort_hybrid_rh_1((unsigned *)workCPU.HostSourcePtr, 0, (int)(workCPU.AmountOfWork - 1), (unsigned *)workCPU.HostResultPtr);
 			}
 			break;
 		}

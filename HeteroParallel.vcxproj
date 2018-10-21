@@ -132,7 +132,11 @@
   <ItemGroup>
     <ClInclude Include="ArrayFireSupport.h" />
     <ClInclude Include="asyncNodeGenerator.h" />
+    <ClInclude Include="BinarySearch.h" />
     <ClInclude Include="CudaSupport.h" />
+    <ClInclude Include="InsertionSort.h" />
+    <ClInclude Include="ParallelMerge.h" />
+    <ClInclude Include="ParallelMergeSort.h" />
     <ClInclude Include="utils.h" />
   </ItemGroup>
   <ItemGroup>

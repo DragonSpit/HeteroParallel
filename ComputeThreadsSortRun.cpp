@@ -45,7 +45,7 @@ int CpuGenerateSortWork(SortToDo & sortSpec, const size_t & NumOfItemsInWorkQuan
 	if (sortSpec.CPU.allowedToWork &&
 		(sortSpec.resultDestination == ResultInCpuMemory     || sortSpec.resultDestination == ResultInEachDevicesMemory ||	// TODO: Where the result is going should not even matter, as long as CPU is allowed to do work, it should do work
 		 sortSpec.resultDestination == ResultInCudaGpuMemory || sortSpec.resultDestination == ResultInOpenclGpuMemory)) {
-		printf("First CPU work item\n");
+		printf("CPU work item being generated\n");
 		workCPU.TypeOfWork = Sort;
 		workCPU.ForWhichWorker = ComputeEngine::CPU;
 		workCPU.AmountOfWork  = NumOfItemsInWorkQuanta;
@@ -75,7 +75,7 @@ int CudaGpuGenerateSortWork(SortToDo & sortSpec, const size_t & NumOfItemsInWork
 		(sortSpec.resultDestination == ResultInCpuMemory     || sortSpec.resultDestination == ResultInEachDevicesMemory ||	// TODO: Where the result is going should not even matter, as long as CudaGpu is allowed to do work, it should do work
 		 sortSpec.resultDestination == ResultInCudaGpuMemory || sortSpec.resultDestination == ResultInOpenclGpuMemory)) {
 		if ((resultArrayIndex_GPU + NumOfItemsInWorkQuanta) < sortSpec.CudaGPU.maxElements) {
-			printf("First CudaGPU work item\n");
+			printf("CudaGPU work item being generated\n");
 			workCPU.TypeOfWork = Sort;
 			workCudaGPU.ForWhichWorker  = ComputeEngine::CUDA_GPU;
 			workCudaGPU.AmountOfWork    = NumOfItemsInWorkQuanta;
@@ -117,7 +117,7 @@ int OpenclGpuGenerateSortWork(SortToDo & sortSpec, const size_t & NumOfItemsInWo
 		(sortSpec.resultDestination == ResultInCpuMemory     || sortSpec.resultDestination == ResultInEachDevicesMemory ||	// TODO: Where the result is going should not even matter, as long as CudaGpu is allowed to do work, it should do work
 		 sortSpec.resultDestination == ResultInCudaGpuMemory || sortSpec.resultDestination == ResultInOpenclGpuMemory)) {
 		if ((resultArrayIndex_GPU + NumOfItemsInWorkQuanta) < sortSpec.OpenclGPU.maxElements) {
-			printf("First OpenclGPU work item\n");
+			printf("OpenclGPU work item being generated\n");
 			workCPU.TypeOfWork = Sort;
 			workOpenclGPU.ForWhichWorker = ComputeEngine::OPENCL_GPU;
 			workOpenclGPU.AmountOfWork  = NumOfItemsInWorkQuanta;
@@ -150,6 +150,15 @@ int OpenclGpuGenerateSortWork(SortToDo & sortSpec, const size_t & NumOfItemsInWo
 	return 0;
 }
 
+bool IsCompletedWorkItemSorte(unsigned long * resultSortedArray_CPU, size_t resultArrayIndex_CPU, size_t NumOfItemsInWorkQuanta)
+{
+	for (size_t i = 0; i < NumOfItemsInWorkQuanta - 1; i++)
+	{
+		if (resultSortedArray_CPU[i] > resultSortedArray_CPU[i + 1])
+			return false;
+	}
+	return true;
+}
 // TODO: Capture the pattern of load balancing any algorithm, possibly using a template to load balance anything.
 // numTimes is needed to see if running the first time is slower than running subsequent times, as this is commonly the case due to OS paging and CPU caching
 int runLoadBalancerSortThread(SortToDo& sortSpec, ofstream& benchmarkFile, unsigned numTimes)
@@ -234,6 +243,8 @@ int runLoadBalancerSortThread(SortToDo& sortSpec, ofstream& benchmarkFile, unsig
 				// ghEventsComputeDone[0] (CPU) was signaled => done with its work item
 			case WAIT_OBJECT_0 + CPU:
 				printf("ghEventsComputeDone CPU event was signaled.\n");
+				if (!IsCompletedWorkItemSorte(resultSortedArray_CPU, resultArrayIndex_CPU, NumOfItemsInWorkQuanta))
+					exit(-1);
 				if (inputWorkIndex < NumOfWorkItems)	// Create new work item for CPU
 				{
 					int returnValue = CpuGenerateSortWork(sortSpec, NumOfItemsInWorkQuanta, sourceUnsortedArray_CPU, sourceArrayIndex_CPU, resultSortedArray_CPU, resultArrayIndex_CPU, inputWorkIndex);
@@ -283,14 +294,14 @@ int runLoadBalancerSortThread(SortToDo& sortSpec, ofstream& benchmarkFile, unsig
 
 		if (sortSpec.resultDestination == ResultInCpuMemory && !sortSpec.CudaGPU.allowedToWork && !sortSpec.OpenclGPU.allowedToWork)
 		{
-			printf("To generate randoms by CPU only, ran at %zd floats/second\n", (size_t)((double)NumOfWorkItems * NumOfItemsInWorkQuanta / timer.getAverageDeltaInSeconds()));
-			printf("CPU generated %0.0f%% randoms\n", (double)numCpuWorkItemsDone / NumOfWorkItems * 100);
+			printf("To sort randoms by CPU only, ran at %zd floats/second\n", (size_t)((double)NumOfWorkItems * NumOfItemsInWorkQuanta / timer.getAverageDeltaInSeconds()));
+			printf("CPU sorted %0.0f%% randoms\n", (double)numCpuWorkItemsDone / NumOfWorkItems * 100);
 			benchmarkFile << NumOfWorkItems * NumOfItemsInWorkQuanta << "\t" << (size_t)((double)NumOfWorkItems * NumOfItemsInWorkQuanta / timer.getAverageDeltaInSeconds()) << endl;
 		}
 		else if (sortSpec.resultDestination == ResultInCpuMemory && sortSpec.CudaGPU.allowedToWork && sortSpec.OpenclGPU.allowedToWork)
 		{
-			printf("Just generation of randoms runs at %zd floats/second\n", (size_t)((double)NumOfWorkItems * NumOfItemsInWorkQuanta / timer.getAverageDeltaInSeconds()));
-			printf("CPU generated %0.0f%% randoms, CUDA GPU generated %0.0f%% randoms, OpenCL GPU generated %0.0f%% randoms\n",
+			printf("Just sorting of randoms runs at %zd floats/second\n", (size_t)((double)NumOfWorkItems * NumOfItemsInWorkQuanta / timer.getAverageDeltaInSeconds()));
+			printf("CPU sorted %0.0f%% randoms, CUDA GPU generated %0.0f%% randoms, OpenCL GPU generated %0.0f%% randoms\n",
 				(double)numCpuWorkItemsDone / NumOfWorkItems * 100, (double)numCudaGpuWorkItemsDone / NumOfWorkItems * 100, (double)numOpenclGpuWorkItemsDone / NumOfWorkItems * 100);
 			benchmarkFile << NumOfWorkItems * NumOfItemsInWorkQuanta << "\t" << (size_t)((double)NumOfWorkItems * NumOfItemsInWorkQuanta / timer.getAverageDeltaInSeconds()) << endl;
 		}
