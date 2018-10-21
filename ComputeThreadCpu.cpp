@@ -38,7 +38,7 @@ DWORD WINAPI ThreadMultiCoreCpuCompute(LPVOID lpParam)
 		{
 			// Event object was signaled
 		case WAIT_OBJECT_0:
-			//printf("ThreadMultiCoreCpuCompute %d received work item to do\n", GetCurrentThreadId());
+			printf("ThreadMultiCoreCpuCompute %d received work item to do\n", GetCurrentThreadId());
 			break;
 			// An error occurred
 		default:
@@ -46,11 +46,23 @@ DWORD WINAPI ThreadMultiCoreCpuCompute(LPVOID lpParam)
 			return 1;
 		}
 
-		// TODO: Do the CPU work requested in the work item
-		unsigned int rngSeed = 2;
-		int rngType = VSL_BRNG_PHILOX4X32X10;	// was VSL_BRNG_MCG59, which doesn't scale as well, seeming to have memory contension past 2 cores
-		int numCores = 1;
-		int rngResult = mklRandomFloatParallel_SkipAhead((float *)workCPU.HostResultPtr, workCPU.AmountOfWork, rngSeed, rngType, numCores);
+		switch (workCPU.TypeOfWork)
+		{
+		case GenerateRandoms:
+			{
+				//printf("CPU compute thread: performing GenerateRandoms type of work\n");
+				unsigned int rngSeed = 2;
+				int rngType = VSL_BRNG_PHILOX4X32X10;	// was VSL_BRNG_MCG59, which doesn't scale as well, seeming to have memory contension past 2 cores
+				int numCores = 1;
+				int rngResult = mklRandomFloatParallel_SkipAhead((float *)workCPU.HostResultPtr, workCPU.AmountOfWork, rngSeed, rngType, numCores);
+			}
+			break;
+		case Sort:
+			{
+			printf("CPU compute thread: performing Sort type of work (not implemented yet)\n");
+			}
+			break;
+		}
 		// Signal the associated event to indicate work item has been finished
 		//printf("ThreadMultiCoreCpuCompute %d done with work item. Signaling dispatcher\n", GetCurrentThreadId());
 		if (!SetEvent(ghEventsComputeDone[ComputeEngine::CPU]))	// Set one event to the signaled state

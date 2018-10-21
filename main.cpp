@@ -61,6 +61,7 @@ extern int indexerNodeExample();
 extern int indexerNodeExampleWithOutputAndQueue();
 extern int mainThread(void);
 extern int benchmarkRngLoadBalancer(void);
+extern int benchmarkSortLoadBalancer();
 extern int openClHelloWorld();
 extern int secondOnenClExample(void);
 extern int clRngExample(void);
@@ -137,15 +138,16 @@ int
 wmain(int argc, char **argv)
 {
 	//mainThread();
-	benchmarkRngLoadBalancer();	// CPU and Cuda GPU RNG
+	benchmarkRngLoadBalancer();		// RNG     by Multi-core CPU, Cuda GPU, and OpenCL GPU
+	//benchmarkSortLoadBalancer();	// Sorting by Multi-core CPU, Cuda GPU, and OpenCL GPU
 	//myMainSort(argc, argv);
-
 	//openClHelloWorld();
 	//secondOnenClExample();
 
 	ArrayFireTest(0);	// CUDA GPU (950M)
 	//ArrayFireTest(1);	// Intel OpenCL GPU (530)
 	//ArrayFireTest(2);	// Intel OpenCL quad-core CPU (i5-6300HQ)
+
 	//ArrayFireIntegerExample(1);
 	//generateRandomArrayInChunks(1, 4, 4 * 1024 * 1024);
 	//generateRandomArrayInChunks(1, 4, 4 * 1024 * 1024);

@@ -45,6 +45,8 @@ int loadBalancerCreateEventsAndThreads(void)
 	HANDLE hThread;
 	DWORD i, dwThreadID;
 
+	printf("loadBalancerCreateEventsAndThreads entering\n");
+
 	ghEventHaveWorkItemForCpu = CreateEvent(
 		NULL,   // default security attributes
 		FALSE,  // auto-reset event object
@@ -142,6 +144,7 @@ int loadBalancerCreateEventsAndThreads(void)
 		return -4;
 	}
 
+	printf("loadBalancerCreateEventsAndThreads exiting\n");
 	return 0;
 }
 

@@ -59,38 +59,35 @@ extern bool   gRunComputeWorkers;
 // memory, this is 1/2 of what my system has, even if you have 32 GB of system memory, 8 GB of graphics memory is substantial percentage of overall memory.
 // Step #1: Let's just put the best benchmarks out of my blog and website and go from there.
 // Step #2: Work on other output options, such a single array in any memory, and an array of workItems in shared memory (i.e. no copy, but less convenient to use)
-int SelectAndRunSortLoadBalancerThread(SortToDo& sortSpec, ofstream& benchmarkFile, unsigned NumTimes)
-{
-	if (sortSpec.resultDestination == ResultInEachDevicesMemory)
-	{
-		printf("SelectAndRunLoadBalancerThread with ResultInEachDevicesMemory\n");
-		// TODO: Need to return an address, number of randoms returned and the size of memory allocated.
-		// TODO: Need to NOT free that memory and make it the responsibility of the user, but provide an interface to de-allocate thru for each device.
-		return runLoadBalancerSortThread(sortSpec, benchmarkFile, NumTimes);
-	}
-	else if (sortSpec.resultDestination == ResultInCudaGpuMemory)
-	{
-		printf("SelectAndRunLoadBalancerThread with ResultInCudaGPUMemory\n");
-		// TODO: Need to return an address, number of randoms returned and the size of memory allocated.
-		// TODO: Need to NOT free that memory and make it the responsibility of the user, but provide an interface to de-allocate thru for each device.
-		runLoadBalancerSortThread(sortSpec, benchmarkFile, NumTimes);
-		sortSpec.Sorted.CPU.Length = 0;
-	}
-	else if (sortSpec.resultDestination == ResultInCpuMemory)
-	{
-		// TODO: Need to not free that memory and make it the responsibility of the user, but provide an interface to de-allocate thru for each device.
-		// TODO: GPU generated memory allocation needs to be different than for non-copy case, to handle each workItem and to copy the result of each workItem
-		// TODO: In this way we can handle way bigger array and need to fail it if workItem's worth of randoms don't fit into GPU memory
-		if (sortSpec.CudaGPU.allowedToWork && sortSpec.CudaGPU.workQuanta > sortSpec.CudaGPU.memoryCapacity)
-			return -3;		// TODO: Define error return codes in the .h file we provide to the users
-
-		runLoadBalancerSortThread(sortSpec, benchmarkFile, NumTimes);
-		sortSpec.Sorted.CudaGPU.Buffer = NULL;
-		sortSpec.Sorted.CudaGPU.Length = 0;
-	}
-
-	return 0;
-}
+//int SelectAndRunSortLoadBalancerThread(SortToDo& sortSpec, ofstream& benchmarkFile, unsigned NumTimes)
+//{
+//	if (sortSpec.resultDestination == ResultInEachDevicesMemory)
+//	{
+//		printf("SelectAndRunLoadBalancerThread with ResultInEachDevicesMemory\n");
+//		// TODO: Need to return an address, number of randoms returned and the size of memory allocated.
+//		// TODO: Need to NOT free that memory and make it the responsibility of the user, but provide an interface to de-allocate thru for each device.
+//		return runLoadBalancerSortThread(sortSpec, benchmarkFile, NumTimes);
+//	}
+//	else if (sortSpec.resultDestination == ResultInCudaGpuMemory)
+//	{
+//		printf("SelectAndRunLoadBalancerThread with ResultInCudaGPUMemory\n");
+//		// TODO: Need to return an address, number of randoms returned and the size of memory allocated.
+//		// TODO: Need to NOT free that memory and make it the responsibility of the user, but provide an interface to de-allocate thru for each device.
+//		runLoadBalancerSortThread(sortSpec, benchmarkFile, NumTimes);
+//		sortSpec.Sorted.CPU.Length = 0;
+//	}
+//	else if (sortSpec.resultDestination == ResultInCpuMemory)
+//	{
+//		// TODO: Need to not free that memory and make it the responsibility of the user, but provide an interface to de-allocate thru for each device.
+//		// TODO: GPU generated memory allocation needs to be different than for non-copy case, to handle each workItem and to copy the result of each workItem
+//		// TODO: In this way we can handle way bigger array and need to fail it if workItem's worth of randoms don't fit into GPU memory
+//
+//		runLoadBalancerSortThread(sortSpec, benchmarkFile, NumTimes);
+//		sortSpec.Sorted.CudaGPU.Length = 0;
+//	}
+//
+//	return 0;
+//}
 
 void MemoryAllocatorCpu_Sort(SortToDo& sortSpec)
 {
@@ -99,21 +96,32 @@ void MemoryAllocatorCpu_Sort(SortToDo& sortSpec)
 	// TODO: Only allocate system memory when we are going to put randoms into it
 	// TODO: Create CpuMemoryEncapsulation class, just like there is one for the GPU
 	if (sortSpec.Sorted.CPU.Buffer == NULL) {
-		printf("Before allocation of sortSpec.totalItemsToSort = %zd\n", sortSpec.totalItemsToSort * sizeof(unsigned));
+		printf("Before allocation of sorted buffer sortSpec.totalItemsToSort = %zd\n", sortSpec.totalItemsToSort * sizeof(unsigned));
 		unsigned * sortedUnsignedArray = new unsigned[sortSpec.totalItemsToSort];
 		// Clearing the arrays also pages them in (warming them up), which improves performance by 3X for the first generator due to first use
 		// TODO: reading one byte from each page is a faster way to warm up (page in) the array. I already have code for this.
 		memset((void *)sortedUnsignedArray, 0, sortSpec.totalItemsToSort * sizeof(unsigned));
 		sortSpec.Sorted.CPU.Buffer = (char *)sortedUnsignedArray;
 		sortSpec.Sorted.CPU.Length = sortSpec.totalItemsToSort * sizeof(unsigned);
+		sortSpec.Sorted.allocatedByMeCpuBuffer = true;
 	}
-	printf("After allocation of sortSpec.totalItemsToSort = %zd at CPU memory location = %p\n", sortSpec.totalItemsToSort * sizeof(unsigned), sortSpec.Sorted.CPU.Buffer);
+	if (sortSpec.Unsorted.CPU.Buffer == NULL) {
+		printf("Before allocation of unsorted buffer sortSpec.totalItemsToSort = %zd\n", sortSpec.totalItemsToSort * sizeof(unsigned));
+		unsigned * unsortedUnsignedArray = new unsigned[sortSpec.totalItemsToSort];
+		// Clearing the arrays also pages them in (warming them up), which improves performance by 3X for the first generator due to first use
+		// TODO: reading one byte from each page is a faster way to warm up (page in) the array. I already have code for this.
+		memset((void *)unsortedUnsignedArray, 0, sortSpec.totalItemsToSort * sizeof(unsigned));
+		sortSpec.Unsorted.CPU.Buffer = (char *)unsortedUnsignedArray;
+		sortSpec.Unsorted.CPU.Length = sortSpec.totalItemsToSort * sizeof(unsigned);
+		sortSpec.Unsorted.allocatedByMeCpuBuffer = true;
+	}
+	printf("After allocation of sortSpec.totalItemsToSort = %zd at CPU memory location = %p and %p\n", sortSpec.totalItemsToSort * sizeof(unsigned), sortSpec.Unsorted.CPU.Buffer, sortSpec.Sorted.CPU.Buffer);
 
 	// TODO: This code needs not be in a memory allocation routine
 	if (sortSpec.CPU.workQuanta == 0)
 		sortSpec.CPU.workQuanta = 20 * 1024 * 1024;	// TODO: Need to define a global constant for this
 
-	printf("NumOfRandomsToGenerate = %zd, CPU.workQuanta = %zd\n", sortSpec.totalItemsToSort, sortSpec.CPU.workQuanta);
+	printf("CPU number of sort items allocated = %zd, CPU.workQuanta = %zd\n", sortSpec.totalItemsToSort, sortSpec.CPU.workQuanta);
 }
 
 int MemoryAllocatorCudaGpu_Sort(SortToDo& sortSpec)
@@ -184,16 +192,27 @@ int ValidatorSort(SortToDo& sortSpec)
 		printf("Error: Maximum number of elements for CPU memory exceeds memory capacity.\n");
 		return -1;
 	}
+	if (sortSpec.CudaGPU.allowedToWork && sortSpec.CudaGPU.workQuanta > sortSpec.CudaGPU.memoryCapacity)
+		return -2;
 	if (sortSpec.CudaGPU.memoryCapacity < (sortSpec.CudaGPU.maxElements * sortSpec.CudaGPU.sizeOfItem)) {
 		printf("Error: Maximum number of elements for CUDA GPU memory exceeds memory capacity.\n");
-		return -2;
+		return -3;
 	}
 	if (sortSpec.OpenclGPU.memoryCapacity < (sortSpec.OpenclGPU.maxElements * sortSpec.OpenclGPU.sizeOfItem)) {
 		printf("Error: Maximum number of elements for OpenCL GPU memory exceeds memory capacity.\n");
-		return -3;
+		return -4;
 	}
 
 	return 0;
+}
+
+void FillWithRandom(unsigned *buff, size_t length, unsigned seed)
+{
+	std:srand(seed);
+	for (int i = 0; i < length; i++)
+	{
+		buff[i] = std::rand();
+	}
 }
 
 int benchmarkSortLoadBalancer()
@@ -245,29 +264,45 @@ int benchmarkSortLoadBalancer()
 	sortSpec.CPU.memoryCapacity = (size_t)16 * 1024 * 1024 * 1024;
 	// TODO: That's all that should be specified - i.e. max percentage of device memory to be used
 	sortSpec.CPU.sizeOfItem = sizeof(unsigned);
-	sortSpec.CPU.maxElements = (size_t)(sortSpec.CPU.memoryCapacity * 0.50) / sortSpec.CPU.sizeOfItem;	// use up to 50% of CPU memory for randoms
+	sortSpec.CPU.maxElements = (size_t)(sortSpec.CPU.memoryCapacity * 0.50 / 2) / sortSpec.CPU.sizeOfItem;	// use up to 50% of CPU memory for sorting and divide by 2 since not in-place
 	sortSpec.CPU.allowedToWork = true;
 
 	sortSpec.CudaGPU.workQuanta = 0;		// indicates user is ok with automatic determination 
 	sortSpec.CudaGPU.memoryCapacity = (size_t)2  * 1024 * 1024 * 1024;
 	// TODO: That's all that should be specified - i.e. max percentage of device memory to be used
 	sortSpec.CudaGPU.sizeOfItem = sizeof(unsigned);
-	sortSpec.CudaGPU.maxElements = (size_t)(sortSpec.CudaGPU.memoryCapacity * 0.75) / sortSpec.CudaGPU.sizeOfItem;	// use up to 75% of GPU memory for randoms
-	sortSpec.CudaGPU.allowedToWork = true;
+	sortSpec.CudaGPU.maxElements = (size_t)(sortSpec.CudaGPU.memoryCapacity * 0.75 / 2) / sortSpec.CudaGPU.sizeOfItem;	// use up to 75% of GPU memory for randoms
+	sortSpec.CudaGPU.allowedToWork = false;
 
 	sortSpec.OpenclGPU.workQuanta = 0;		// indicates user is ok with automatic determination 
 	sortSpec.OpenclGPU.memoryCapacity = (size_t)6 * 1024 * 1024 * 1024;
 	// TODO: That's all that should be specified - i.e. max percentage of device memory to be used
 	sortSpec.OpenclGPU.sizeOfItem = sizeof(unsigned);
-	sortSpec.OpenclGPU.maxElements = (size_t)(sortSpec.OpenclGPU.memoryCapacity * 0.75) / sortSpec.OpenclGPU.sizeOfItem;	// use up to 75% of GPU memory for randoms
-	sortSpec.OpenclGPU.allowedToWork = true;
+	sortSpec.OpenclGPU.maxElements = (size_t)(sortSpec.OpenclGPU.memoryCapacity * 0.75 / 2) / sortSpec.OpenclGPU.sizeOfItem;	// use up to 75% of GPU memory for randoms
+	sortSpec.OpenclGPU.allowedToWork = false;
+
+	// TODO: Source buffers will most likely come from external sources, such as previous computational stage providing input to this sorting stage
+	sortSpec.Unsorted.CPU.Buffer = (char *) new unsigned[sortSpec.totalItemsToSort];
+	sortSpec.Unsorted.CPU.Length = sortSpec.totalItemsToSort * sortSpec.CPU.sizeOfItem;
+	sortSpec.Unsorted.allocatedByMeCpuBuffer = false;
+	FillWithRandom((unsigned *)sortSpec.Unsorted.CPU.Buffer, sortSpec.Unsorted.CPU.Length / sortSpec.CPU.sizeOfItem, 2);
+
+	sortSpec.Unsorted.CudaGPU.Buffer = NULL;		// NULL implies the generator is to allocate memory. non-NULL implies reuse the buffer provided
+	sortSpec.Unsorted.CudaGPU.Length = 0;
+	sortSpec.Unsorted.allocatedByMeCudaGpuBuffer = false;
+	sortSpec.Unsorted.OpenclGPU.Buffer = NULL;	// NULL implies the generator is to allocate memory. non-NULL implies reuse the buffer provided
+	sortSpec.Unsorted.OpenclGPU.Length = 0;
+	sortSpec.Unsorted.allocatedByMeOpenclGpuBuffer = false;
 
 	sortSpec.Sorted.CPU.Buffer = NULL;			// NULL implies the generator is to allocate memory. non-NULL implies reuse the buffer provided
 	sortSpec.Sorted.CPU.Length = 0;
+	sortSpec.Sorted.allocatedByMeCpuBuffer = false;
 	sortSpec.Sorted.CudaGPU.Buffer = NULL;		// NULL implies the generator is to allocate memory. non-NULL implies reuse the buffer provided
 	sortSpec.Sorted.CudaGPU.Length = 0;
+	sortSpec.Sorted.allocatedByMeCudaGpuBuffer = false;
 	sortSpec.Sorted.OpenclGPU.Buffer = NULL;	// NULL implies the generator is to allocate memory. non-NULL implies reuse the buffer provided
 	sortSpec.Sorted.OpenclGPU.Length = 0;
+	sortSpec.Sorted.allocatedByMeOpenclGpuBuffer = false;
 	printf("sortSpec set\n");
 
 	if (ValidatorSort(sortSpec) != 0)
@@ -317,7 +352,7 @@ int benchmarkSortLoadBalancer()
 		// TODO: Create a UWP application service for high performance and accelerated algorithms, providing LSD Radix Sort, CudaRand algorithms, MKL algorithms, to make them available to C# and other UWP applications. Sadly, transfer of data runs at about 30MBytes/sec, which is way too slow. In-process UWP application service should perform well enough
 
 		auto elapsed = time_call([&] {
-			SelectAndRunSortLoadBalancerThread(sortSpec, benchmarkFile, NumTimes);
+			runLoadBalancerSortThread(sortSpec, benchmarkFile, NumTimes);
 		});
 		printf("SelectAndRunSortLoadBalancerThread ran at an overall rate of %zd unsigned/second\n", (size_t)((double)sortSpec.totalItemsToSort / (elapsed / 1000.0)));
 	}

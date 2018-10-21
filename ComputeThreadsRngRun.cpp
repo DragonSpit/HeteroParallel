@@ -146,7 +146,7 @@ int runLoadBalancerRngThread(RandomsToGenerate& genSpec, ofstream& benchmarkFile
 	else if (genSpec.resultDestination == ResultInCpuMemory)
 		NumOfWorkItems = NumOfWorkItems = NumOfRandomsToGenerate / NumOfRandomsInWorkQuanta;
 
-	float *randomFloatArray_GPU = (float *)gCudaResultMemory->m_gpu_memory;
+	float *randomFloatArray_GPU = (float *)(gCudaResultMemory != NULL ? gCudaResultMemory->m_gpu_memory : NULL);
 	float *randomFloatArray_CPU = (float *)genSpec.generated.CPU.Buffer;
 
 	for (unsigned numRuns = 0; numRuns < numTimes; numRuns++)

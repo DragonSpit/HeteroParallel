@@ -19,8 +19,11 @@ struct RandomsGenerated
 struct SortBuffers
 {
 	BufferType CPU;			// spec for results in CPU/system memory
+	bool allocatedByMeCpuBuffer;
 	BufferType CudaGPU;		// spec for results in graphics/GPU memory
+	bool allocatedByMeCudaGpuBuffer;
 	BufferType OpenclGPU;	// spec for results in graphics/GPU memory
+	bool allocatedByMeOpenclGpuBuffer;
 };
 
 enum ComputeEngine {
