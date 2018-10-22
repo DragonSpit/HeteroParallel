@@ -46,15 +46,15 @@ int CpuGenerateSortWork(SortToDo & sortSpec, const size_t & NumOfItemsInWorkQuan
 	if (sortSpec.CPU.allowedToWork &&
 		(sortSpec.resultDestination == ResultInCpuMemory     || sortSpec.resultDestination == ResultInEachDevicesMemory ||	// TODO: Where the result is going should not even matter, as long as CPU is allowed to do work, it should do work
 		 sortSpec.resultDestination == ResultInCudaGpuMemory || sortSpec.resultDestination == ResultInOpenclGpuMemory)) {
-		printf("CPU work item being generated\n");
+		//printf("CPU work item being generated\n");
 		workCPU.TypeOfWork = Sort;
 		workCPU.ForWhichWorker = ComputeEngine::CPU;
 		workCPU.AmountOfWork  = NumOfItemsInWorkQuanta;
 		workCPU.HostSourcePtr = (char *)(&(sourceArray_CPU[sourceArrayIndex_CPU]));
 		workCPU.HostResultPtr = (char *)(&(resultArray_CPU[resultArrayIndex_CPU]));
 		workCudaGPU.DeviceResultPtr = NULL;
-		printf("CPU work item: amountOfWork = %zd at CPU source memory address %p and destination address %p\n", workCPU.AmountOfWork, workCPU.HostSourcePtr, workCPU.HostResultPtr);
-		printf("Event set for work item for MultiCore CPU\n");
+		//printf("CPU work item: amountOfWork = %zd at CPU source memory address %p and destination address %p\n", workCPU.AmountOfWork, workCPU.HostSourcePtr, workCPU.HostResultPtr);
+		//printf("Event set for work item for MultiCore CPU\n");
 		if (!SetEvent(ghEventHaveWorkItemForCpu))	// signal that CPU has a work item to work on
 		{
 			printf("SetEvent ghEventWorkForCpu failed (%d)\n", GetLastError());
@@ -192,7 +192,7 @@ int runLoadBalancerSortThread(SortToDo& sortSpec, ofstream& benchmarkFile, unsig
 
 	for (unsigned numRuns = 0; numRuns < numTimes; numRuns++)
 	{
-		printf("runLoadBalancerSortThread: run %d\n", numRuns);
+		//printf("runLoadBalancerSortThread: run %d\n", numRuns);
 		TimerCycleAccurateArray	timer;
 		timer.reset();
 		timer.timeStamp();
@@ -244,7 +244,7 @@ int runLoadBalancerSortThread(SortToDo& sortSpec, ofstream& benchmarkFile, unsig
 			{
 				// ghEventsComputeDone[0] (CPU) was signaled => done with its work item
 			case WAIT_OBJECT_0 + CPU:
-				printf("ghEventsComputeDone CPU event was signaled.\n");
+				//printf("ghEventsComputeDone CPU event was signaled.\n");
 				if (!IsCompletedWorkItemSorted(resultSortedArray_CPU, resultArrayIndex_CPU - NumOfItemsInWorkQuanta, NumOfItemsInWorkQuanta))
 					exit(-1);
 				if (inputWorkIndex < NumOfWorkItems)	// Create new work item for CPU
@@ -296,14 +296,14 @@ int runLoadBalancerSortThread(SortToDo& sortSpec, ofstream& benchmarkFile, unsig
 
 		if (sortSpec.resultDestination == ResultInCpuMemory && !sortSpec.CudaGPU.allowedToWork && !sortSpec.OpenclGPU.allowedToWork)
 		{
-			printf("To sort randoms by CPU only, ran at %zd floats/second\n", (size_t)((double)NumOfWorkItems * NumOfItemsInWorkQuanta / timer.getAverageDeltaInSeconds()));
+			printf("To sort randoms by CPU only, ran at %zd unsigned/second\n", (size_t)((double)NumOfWorkItems * NumOfItemsInWorkQuanta / timer.getAverageDeltaInSeconds()));
 			printf("CPU sorted %0.0f%% randoms\n", (double)numCpuWorkItemsDone / NumOfWorkItems * 100);
 			benchmarkFile << NumOfWorkItems * NumOfItemsInWorkQuanta << "\t" << (size_t)((double)NumOfWorkItems * NumOfItemsInWorkQuanta / timer.getAverageDeltaInSeconds()) << endl;
 		}
 		else if (sortSpec.resultDestination == ResultInCpuMemory && sortSpec.CudaGPU.allowedToWork && sortSpec.OpenclGPU.allowedToWork)
 		{
 			printf("Just sorting of randoms runs at %zd floats/second\n", (size_t)((double)NumOfWorkItems * NumOfItemsInWorkQuanta / timer.getAverageDeltaInSeconds()));
-			printf("CPU sorted %0.0f%% randoms, CUDA GPU generated %0.0f%% randoms, OpenCL GPU generated %0.0f%% randoms\n",
+			printf("CPU sorted %0.0f%% randoms, CUDA GPU sorted %0.0f%% randoms, OpenCL GPU sorted %0.0f%% randoms\n",
 				(double)numCpuWorkItemsDone / NumOfWorkItems * 100, (double)numCudaGpuWorkItemsDone / NumOfWorkItems * 100, (double)numOpenclGpuWorkItemsDone / NumOfWorkItems * 100);
 			benchmarkFile << NumOfWorkItems * NumOfItemsInWorkQuanta << "\t" << (size_t)((double)NumOfWorkItems * NumOfItemsInWorkQuanta / timer.getAverageDeltaInSeconds()) << endl;
 		}

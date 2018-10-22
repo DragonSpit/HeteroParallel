@@ -39,7 +39,7 @@ DWORD WINAPI ThreadMultiCoreCpuCompute(LPVOID lpParam)
 		{
 			// Event object was signaled
 		case WAIT_OBJECT_0:
-			printf("ThreadMultiCoreCpuCompute %d received work item to do\n", GetCurrentThreadId());
+			//printf("ThreadMultiCoreCpuCompute %d received work item to do\n", GetCurrentThreadId());
 			break;
 			// An error occurred
 		default:
@@ -60,7 +60,7 @@ DWORD WINAPI ThreadMultiCoreCpuCompute(LPVOID lpParam)
 			break;
 		case Sort:
 			{
-				printf("CPU compute thread: performing Sort type of work from %p to %p of length %zd\n", workCPU.HostSourcePtr, workCPU.HostResultPtr, workCPU.AmountOfWork);
+				//printf("CPU compute thread: performing Sort type of work from %p to %p of length %zd\n", workCPU.HostSourcePtr, workCPU.HostResultPtr, workCPU.AmountOfWork);
 				parallel_merge_sort_hybrid_rh_1((unsigned *)workCPU.HostSourcePtr, 0, (int)(workCPU.AmountOfWork - 1), (unsigned *)workCPU.HostResultPtr);
 				//std::cout << "sorted array: " << std::endl;
 				//for (unsigned long i = 0; i < 8; i++)
