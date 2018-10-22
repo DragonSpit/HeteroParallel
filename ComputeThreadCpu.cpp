@@ -60,8 +60,12 @@ DWORD WINAPI ThreadMultiCoreCpuCompute(LPVOID lpParam)
 			break;
 		case Sort:
 			{
-				printf("CPU compute thread: performing Sort type of work\n");
+				printf("CPU compute thread: performing Sort type of work from %p to %p of length %zd\n", workCPU.HostSourcePtr, workCPU.HostResultPtr, workCPU.AmountOfWork);
 				parallel_merge_sort_hybrid_rh_1((unsigned *)workCPU.HostSourcePtr, 0, (int)(workCPU.AmountOfWork - 1), (unsigned *)workCPU.HostResultPtr);
+				//std::cout << "sorted array: " << std::endl;
+				//for (unsigned long i = 0; i < 8; i++)
+				//	std::cout << ((unsigned *)workCPU.HostSourcePtr)[i] << " " << ((unsigned *)workCPU.HostResultPtr)[i] << std::endl;
+				//std::cout << std::endl;
 			}
 			break;
 		}

@@ -6,6 +6,7 @@
 #include <cuda_runtime.h>
 #include <vector_types.h>
 #include <helper_cuda.h>
+#include <random>
 
 #include "mkl_vsl.h"
 
@@ -206,13 +207,17 @@ int ValidatorSort(SortToDo& sortSpec)
 	return 0;
 }
 
-void FillWithRandom(unsigned *buff, size_t length, unsigned seed)
+void FillWithRandom(unsigned long *buff, size_t length, unsigned seed)
 {
+	std::mt19937 mt(seed);
+
 	std:srand(seed);
 	for (int i = 0; i < length; i++)
 	{
-		buff[i] = std::rand();
+		buff[i] = static_cast<unsigned>(mt());
+		//printf("%u\n", buff[i]);
 	}
+	cout << "Filled array of length " << length << " with randoms" << endl;
 }
 
 int benchmarkSortLoadBalancer()
@@ -282,10 +287,10 @@ int benchmarkSortLoadBalancer()
 	sortSpec.OpenclGPU.allowedToWork = false;
 
 	// TODO: Source buffers will most likely come from external sources, such as previous computational stage providing input to this sorting stage
-	sortSpec.Unsorted.CPU.Buffer = (char *) new unsigned[sortSpec.totalItemsToSort];
+	sortSpec.Unsorted.CPU.Buffer = (char *) new unsigned long[sortSpec.totalItemsToSort];
 	sortSpec.Unsorted.CPU.Length = sortSpec.totalItemsToSort * sortSpec.CPU.sizeOfItem;
 	sortSpec.Unsorted.allocatedByMeCpuBuffer = false;
-	FillWithRandom((unsigned *)sortSpec.Unsorted.CPU.Buffer, sortSpec.Unsorted.CPU.Length / sortSpec.CPU.sizeOfItem, 2);
+	FillWithRandom((unsigned long *)sortSpec.Unsorted.CPU.Buffer, sortSpec.Unsorted.CPU.Length / sortSpec.CPU.sizeOfItem, 2);
 
 	sortSpec.Unsorted.CudaGPU.Buffer = NULL;		// NULL implies the generator is to allocate memory. non-NULL implies reuse the buffer provided
 	sortSpec.Unsorted.CudaGPU.Length = 0;

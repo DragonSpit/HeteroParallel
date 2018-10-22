@@ -39,7 +39,8 @@ extern bool   gRunComputeWorkers;
 
 // TODO: Make generic to handle any data type to be sorted
 // TODO: Handle in-place sorting and stable sorting
-int CpuGenerateSortWork(SortToDo & sortSpec, const size_t & NumOfItemsInWorkQuanta, unsigned long * sourceArray_CPU, size_t & sourceArrayIndex_CPU,
+int CpuGenerateSortWork(SortToDo & sortSpec, const size_t & NumOfItemsInWorkQuanta,
+						unsigned long * sourceArray_CPU, size_t & sourceArrayIndex_CPU,
 						unsigned long * resultArray_CPU, size_t & resultArrayIndex_CPU, size_t & inputWorkIndex)
 {
 	if (sortSpec.CPU.allowedToWork &&
@@ -150,10 +151,11 @@ int OpenclGpuGenerateSortWork(SortToDo & sortSpec, const size_t & NumOfItemsInWo
 	return 0;
 }
 
-bool IsCompletedWorkItemSorte(unsigned long * resultSortedArray_CPU, size_t resultArrayIndex_CPU, size_t NumOfItemsInWorkQuanta)
+bool IsCompletedWorkItemSorted(unsigned long * resultSortedArray_CPU, size_t resultArrayIndex_CPU, size_t NumOfItemsInWorkQuanta)
 {
 	for (size_t i = 0; i < NumOfItemsInWorkQuanta - 1; i++)
 	{
+		//printf("%u\n", resultSortedArray_CPU[i]);
 		if (resultSortedArray_CPU[i] > resultSortedArray_CPU[i + 1])
 			return false;
 	}
@@ -243,7 +245,7 @@ int runLoadBalancerSortThread(SortToDo& sortSpec, ofstream& benchmarkFile, unsig
 				// ghEventsComputeDone[0] (CPU) was signaled => done with its work item
 			case WAIT_OBJECT_0 + CPU:
 				printf("ghEventsComputeDone CPU event was signaled.\n");
-				if (!IsCompletedWorkItemSorte(resultSortedArray_CPU, resultArrayIndex_CPU, NumOfItemsInWorkQuanta))
+				if (!IsCompletedWorkItemSorted(resultSortedArray_CPU, resultArrayIndex_CPU - NumOfItemsInWorkQuanta, NumOfItemsInWorkQuanta))
 					exit(-1);
 				if (inputWorkIndex < NumOfWorkItems)	// Create new work item for CPU
 				{
