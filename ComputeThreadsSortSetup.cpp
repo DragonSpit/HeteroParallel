@@ -284,7 +284,7 @@ int benchmarkSortLoadBalancer()
 	// TODO: That's all that should be specified - i.e. max percentage of device memory to be used
 	sortSpec.OpenclGPU.sizeOfItem = sizeof(unsigned);
 	sortSpec.OpenclGPU.maxElements = (size_t)(sortSpec.OpenclGPU.memoryCapacity * 0.75 / 2) / sortSpec.OpenclGPU.sizeOfItem;	// use up to 75% of GPU memory for randoms
-	sortSpec.OpenclGPU.allowedToWork = false;
+	sortSpec.OpenclGPU.allowedToWork = true;
 
 	// TODO: Source buffers will most likely come from external sources, such as previous computational stage providing input to this sorting stage
 	sortSpec.Unsorted.CPU.Buffer = (char *) new unsigned long[sortSpec.totalItemsToSort];
@@ -329,6 +329,7 @@ int benchmarkSortLoadBalancer()
 	// Start at maximum size of array of randoms to generate, so that we can re-use the allocated array on the first iteration, since the rest of iteration will generate fewer randoms and will fit into the largest array
 	for (size_t elementsToSort = maxNumberOfElementsToSort; elementsToSort >= minNumberOfElementsToSort; elementsToSort -= elementsToSortIncrement)
 	{
+		FillWithRandom((unsigned long *)sortSpec.Unsorted.CPU.Buffer, sortSpec.Unsorted.CPU.Length / sortSpec.CPU.sizeOfItem, 2);
 		sortSpec.totalItemsToSort = elementsToSort;
 		// TODO: The two use cases I'm going to work on are:
 		// TODO: 1. Generate a requested number of random numbers in system memory with the help of all computational units (multi-core CPU, CUDA GPU(s), OpenCL GPU(s), OpenCL FPGA(s)

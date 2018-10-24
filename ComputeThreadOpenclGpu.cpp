@@ -30,6 +30,18 @@ OpenClGpuRngEncapsulation    * gOpenClRngSupport   = NULL;	// TODO: Make sure to
 OpenClGpuMemoryEncapsulation * gOpenClSourceMemory = NULL;	// TODO: Make sure to delete it once done
 OpenClGpuMemoryEncapsulation * gOpenClResultMemory = NULL;	// TODO: Make sure to delete it once done
 
+bool IsCompletedWorkItemSorted(unsigned * resultSortedArray_CPU, size_t resultArrayIndex_CPU, size_t NumOfItemsInWorkQuanta)
+{
+	for (size_t i = 0; i < NumOfItemsInWorkQuanta - 1; i++)
+	{
+		if (i < 2000)
+			printf("%u\n", resultSortedArray_CPU[i]);
+		if (resultSortedArray_CPU[i] > resultSortedArray_CPU[i + 1])
+			return false;
+	}
+	return true;
+}
+
 DWORD WINAPI ThreadOpenclGpuCompute(LPVOID lpParam)
 {
 	UNREFERENCED_PARAMETER(lpParam);	// lpParam not used in this example
@@ -58,10 +70,14 @@ DWORD WINAPI ThreadOpenclGpuCompute(LPVOID lpParam)
 		switch (workOpenclGPU.TypeOfWork)
 		{
 		case GenerateRandoms:
+			//printf("Executing generation of random work item\n");
 			generateRandomFloatArray(gOpenClResultMemory->m_gpu_memory, workOpenclGPU.AmountOfWork, (float *)workOpenclGPU.HostResultPtr);
 			break;
 		case Sort:
+			//printf("Executing sorting work item\n");
 			sortArray((unsigned *)workOpenclGPU.HostSourcePtr, workOpenclGPU.AmountOfWork, (unsigned *)workOpenclGPU.HostResultPtr);
+			//if (!IsCompletedWorkItemSorted((unsigned *)workOpenclGPU.HostResultPtr, 0, workOpenclGPU.AmountOfWork))
+			//	exit(-1);
 			break;
 		default:
 			printf("ThreadOpenclGpuCompute: Don't know how to do this kind of work (%d)\n", workOpenclGPU.TypeOfWork);
