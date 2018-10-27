@@ -3,11 +3,6 @@
 #include <fstream>
 #include <arrayfire.h>
 
-// Required to include CUDA vector types
-#include <cuda_runtime.h>
-#include <vector_types.h>
-#include <helper_cuda.h>
-
 #include "mkl_vsl.h"
 
 #include "asyncNodeGenerator.h"
@@ -69,6 +64,7 @@ DWORD WINAPI ThreadOpenclGpuCompute(LPVOID lpParam)
 		{
 		case GenerateRandoms:
 			//printf("Executing generation of random work item\n");
+// TODO: Switch away from using gOpenClResultMemory->m_gpu_memory and use workOpenclGPU.HostSourcePtr instead (needs tested)
 			generateRandomFloatArray(gOpenClResultMemory->m_gpu_memory, workOpenclGPU.AmountOfWork, (float *)workOpenclGPU.HostResultPtr);
 			break;
 		case Sort:

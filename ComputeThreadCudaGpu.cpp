@@ -58,7 +58,6 @@ DWORD WINAPI ThreadCudaGpuCompute(LPVOID lpParam)
 			break;
 		case Sort:
 			printf("Cuda GPU compute thread: performing Sort type of work (not implemented yet)\n");
-// TODO: If CUDA sort is in place, then make them all "in-place" since my parallel merge sort can be "kinda in-place" where the result is back in the original, but still requires an extra array.
 			break;
 		}
 

@@ -34,6 +34,8 @@ bool testSort(int argc, char **argv)
     bool keysOnly = checkCmdLineFlag(argc, (const char **)argv, "keysonly");
     bool quiet    = checkCmdLineFlag(argc, (const char **)argv, "quiet");
 
+	keysOnly = true;
+
     if (checkCmdLineFlag(argc, (const char **)argv, "n"))
     {
         cmdVal = getCmdLineArgumentInt(argc, (const char **)argv, "n");
@@ -139,23 +141,40 @@ bool testSort(int argc, char **argv)
 
     for (unsigned int i = 0; i < numIterations; i++)
     {
-        // reset data before sort
-        d_keys= h_keys;
+		checkCudaErrors(cudaEventRecord(start_event, 0));
+
+		// reset data before sort
+        d_keys = h_keys;
 
         if (!keysOnly)
             d_values = h_values;
-
-        checkCudaErrors(cudaEventRecord(start_event, 0));
 
         if (keysOnly)
             thrust::sort(d_keys.begin(), d_keys.end());
         else
             thrust::sort_by_key(d_keys.begin(), d_keys.end(), d_values.begin());
 
-        checkCudaErrors(cudaEventRecord(stop_event, 0));
+		// Get results back to host for correctness checking
+		thrust::copy(d_keys.begin(), d_keys.end(), h_keysSorted.begin());
+
+		if (!keysOnly)
+			thrust::copy(d_values.begin(), d_values.end(), h_values.begin());
+
+		getLastCudaError("copying results to host memory");
+
+		checkCudaErrors(cudaEventRecord(stop_event, 0));
         checkCudaErrors(cudaEventSynchronize(stop_event));
 
-        float time = 0;
+		// Check results
+		bool bTestResult = thrust::is_sorted(h_keysSorted.begin(), h_keysSorted.end());
+
+		if (!bTestResult && !quiet)
+		{
+			printf("Error: Result array is not sorted\n");
+			return false;
+		}
+
+		float time = 0;
         checkCudaErrors(cudaEventElapsedTime(&time, start_event, stop_event));
         totalTime += time;
     }
@@ -166,26 +185,10 @@ bool testSort(int argc, char **argv)
 
     getLastCudaError("after radixsort");
 
-    // Get results back to host for correctness checking
-    thrust::copy(d_keys.begin(), d_keys.end(), h_keysSorted.begin());
+	checkCudaErrors(cudaEventDestroy(start_event));
+	checkCudaErrors(cudaEventDestroy(stop_event));
 
-    if (!keysOnly)
-        thrust::copy(d_values.begin(), d_values.end(), h_values.begin());
-
-    getLastCudaError("copying results to host memory");
-
-    // Check results
-    bool bTestResult = thrust::is_sorted(h_keysSorted.begin(), h_keysSorted.end());
-
-    checkCudaErrors(cudaEventDestroy(start_event));
-    checkCudaErrors(cudaEventDestroy(stop_event));
-
-    if (!bTestResult  && !quiet)
-    {
-        return false;
-    }
-
-    return bTestResult;
+	return true;
 }
 
 int CudaThrustSort(int argc, char **argv)
@@ -197,7 +200,7 @@ int CudaThrustSort(int argc, char **argv)
 
     bool bTestResult = false;
 
-	for (unsigned i = 0; i < 1; i++)
+	for (unsigned i = 0; i < 11; i++)
 	{
 		if (checkCmdLineFlag(argc, (const char **)argv, "float"))
 			bTestResult = testSort<float, true>(argc, argv);
