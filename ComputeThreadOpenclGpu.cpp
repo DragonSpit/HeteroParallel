@@ -16,11 +16,9 @@
 
 using namespace std;
 
-//extern void GenerateRandFloatCuda(float *devMemPtr, float *sysMemPtr, curandGenerator_t& prngGPU, size_t numRandoms, bool verify, curandGenerator_t& prngCPU);
-//extern void copyCudaToSystemMemory(void *systemMemPtr, void *cudaMemPtr, size_t numBytes);
 extern HANDLE ghEventsComputeDone[NumComputeDoneEvents];	// 0 - MultiCoreCpu, 1 - CudaGpu, 2 - OpenClGpu, 3 - OpenClFpga
 extern void generateRandomFloatArray(af::array& randomArrayFloat, size_t numRandoms, float* hostDestArray);
-extern void sortArray(unsigned * inHostArray, size_t numItems, unsigned * outHostArray);
+extern void sortArray_ArrayFire(unsigned * inHostArray, size_t numItems, unsigned * outHostArray);
 extern bool gRunComputeWorkers;
 
 WorkItemType workOpenclGPU;			// work item for Cuda GPU to do. This is to be setup before ghEventHaveWorkItemForCudaGpu gets set to notify the CPU thread to start working on it
@@ -75,7 +73,7 @@ DWORD WINAPI ThreadOpenclGpuCompute(LPVOID lpParam)
 			break;
 		case Sort:
 			//printf("Executing sorting work item\n");
-			sortArray((unsigned *)workOpenclGPU.HostSourcePtr, workOpenclGPU.AmountOfWork, (unsigned *)workOpenclGPU.HostResultPtr);
+			sortArray_ArrayFire((unsigned *)workOpenclGPU.HostSourcePtr, workOpenclGPU.AmountOfWork, (unsigned *)workOpenclGPU.HostResultPtr);
 			//if (!IsCompletedWorkItemSorted((unsigned *)workOpenclGPU.HostResultPtr, 0, workOpenclGPU.AmountOfWork))
 			//	exit(-1);
 			break;

@@ -243,7 +243,7 @@ int benchmarkSortLoadBalancer()
 	//gCudaRngSupport = new CudaRngEncapsulation(prngSeed);
 
 	// TODO: Needs to be part of OpenCL GPU setup, once at the beginning
-	af::setDevice(1);	// device 1 on my laptop is Intel 530 GPU
+	af::setDevice(1);	// device 0 if CUDA 950M GPU, device 1 on my laptop is Intel 530 GPU, device 2 is Inte multi-core CPU
 	af::info();
 
 	//gOpenClRngSupport = new OpenClGpuRngEncapsulation(prngSeed);
@@ -253,7 +253,7 @@ int benchmarkSortLoadBalancer()
 
 	size_t maxNumberOfElementsToSort = (size_t)400 * 1024 * 1024;
 	size_t minNumberOfElementsToSort = (size_t)380 * 1024 * 1024;
-	unsigned NumTimes = 10;
+	unsigned NumTimes = 1;
 	// TODO: Seems to be a bug going down to 20M randoms - runs forever
 	// TODO: We also need to not be limited to the increment being of the same size as workQuanta
 	size_t elementsToSortIncrement = (size_t)20 * 1024 * 1024;	// workQuanta increment to make sure total work divides evenly until we can support it not
@@ -270,7 +270,7 @@ int benchmarkSortLoadBalancer()
 	// TODO: That's all that should be specified - i.e. max percentage of device memory to be used
 	sortSpec.CPU.sizeOfItem = sizeof(unsigned);
 	sortSpec.CPU.maxElements = (size_t)(sortSpec.CPU.memoryCapacity * 0.50 / 2) / sortSpec.CPU.sizeOfItem;	// use up to 50% of CPU memory for sorting and divide by 2 since not in-place
-	sortSpec.CPU.allowedToWork = true;
+	sortSpec.CPU.allowedToWork = false;
 
 	sortSpec.CudaGPU.workQuanta = 0;		// indicates user is ok with automatic determination 
 	sortSpec.CudaGPU.memoryCapacity = (size_t)2  * 1024 * 1024 * 1024;
@@ -330,6 +330,7 @@ int benchmarkSortLoadBalancer()
 	for (size_t elementsToSort = maxNumberOfElementsToSort; elementsToSort >= minNumberOfElementsToSort; elementsToSort -= elementsToSortIncrement)
 	{
 		FillWithRandom((unsigned long *)sortSpec.Unsorted.CPU.Buffer, sortSpec.Unsorted.CPU.Length / sortSpec.CPU.sizeOfItem, 2);
+		FillWithRandom((unsigned long *)sortSpec.Sorted.CPU.Buffer,   sortSpec.Unsorted.CPU.Length / sortSpec.CPU.sizeOfItem, 2);	// warm up the output buffer. Faster if we just cleared it
 		sortSpec.totalItemsToSort = elementsToSort;
 		// TODO: The two use cases I'm going to work on are:
 		// TODO: 1. Generate a requested number of random numbers in system memory with the help of all computational units (multi-core CPU, CUDA GPU(s), OpenCL GPU(s), OpenCL FPGA(s)

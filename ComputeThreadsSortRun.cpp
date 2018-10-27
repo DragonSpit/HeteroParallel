@@ -166,7 +166,7 @@ bool IsCompletedWorkItemSorted(unsigned long * resultSortedArray_CPU, size_t res
 // numTimes is needed to see if running the first time is slower than running subsequent times, as this is commonly the case due to OS paging and CPU caching
 int runLoadBalancerSortThread(SortToDo& sortSpec, ofstream& benchmarkFile, unsigned numTimes)
 {
-	printf("runLoadBalancerSortThread entering\n");
+	//printf("runLoadBalancerSortThread entering\n");
 	size_t NumOfItemsToSort = sortSpec.totalItemsToSort;
 	size_t NumOfItemsInWorkQuanta = sortSpec.CPU.workQuanta;		// TODO: Need to separate CPU and GPU workQuanta, and handle them being different
 																	// TODO: Fix the problem with the case of asking the CudaGPU to generate more randoms that can fit into it's memory, but no other computational units are helping to generate more
@@ -179,12 +179,10 @@ int runLoadBalancerSortThread(SortToDo& sortSpec, ofstream& benchmarkFile, unsig
 		NumOfWorkItems = __min(sortSpec.CudaGPU.maxElements, NumOfItemsToSort) / sortSpec.CudaGPU.workQuanta;
 	else if (sortSpec.resultDestination == ResultInCpuMemory)
 		NumOfWorkItems = NumOfWorkItems = NumOfItemsToSort / NumOfItemsInWorkQuanta;
-	printf("runLoadBalancerSortThread #1\n");
 
 	//TODO: need source device memory!
 	unsigned long *sourceUnsortedArray_CudaGPU = (unsigned long *)(gCudaSourceMemory != NULL ? gCudaSourceMemory->m_gpu_memory : NULL);
 	unsigned long *resultSortedArray_CudaGPU   = (unsigned long *)(gCudaSourceMemory != NULL ? gCudaResultMemory->m_gpu_memory : NULL);
-	printf("runLoadBalancerSortThread #2\n");
 	// TODO: OpenCL memory for now needs to be host memory, as we are getting sorting to work from host to host memory first. Plus, ArrayFire has it's own array data type in GPU memory instead of using host mapped memory
 	unsigned long *sourceUnsortedArray_OpenClGPU = NULL;
 	unsigned long *resultSortedArray_OpenClGPU   = NULL;
@@ -320,7 +318,7 @@ int runLoadBalancerSortThread(SortToDo& sortSpec, ofstream& benchmarkFile, unsig
 		{
 			printf("Just sorting of randoms runs at %zd unsigned/second\n", (size_t)((double)NumOfWorkItems * NumOfItemsInWorkQuanta / timer.getAverageDeltaInSeconds()));
 			printf("CPU sorted %zd randoms, OpenCL GPU sorted %zd randoms.\nAsked to sort %zd, sorted %zd\n",
-				resultArrayIndex_CPU, resultArrayIndex_CudaGPU, NumOfItemsToSort, resultArrayIndex_CPU + resultArrayIndex_CudaGPU);
+				resultArrayIndex_CPU, resultArrayIndex_OpenClGPU, NumOfItemsToSort, resultArrayIndex_CPU + resultArrayIndex_OpenClGPU);
 			benchmarkFile << NumOfWorkItems * NumOfItemsInWorkQuanta << "\t" << (size_t)((double)NumOfWorkItems * NumOfItemsInWorkQuanta / timer.getAverageDeltaInSeconds()) << endl;
 		}
 		else if ((sortSpec.resultDestination == ResultInEachDevicesMemory && sortSpec.CudaGPU.allowedToWork) ||

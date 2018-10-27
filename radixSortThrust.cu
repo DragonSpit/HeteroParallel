@@ -188,7 +188,7 @@ bool testSort(int argc, char **argv)
     return bTestResult;
 }
 
-int myMainSort(int argc, char **argv)
+int CudaThrustSort(int argc, char **argv)
 {
     // Start logs
     printf("%s Starting...\n\n", argv[0]);
@@ -197,12 +197,15 @@ int myMainSort(int argc, char **argv)
 
     bool bTestResult = false;
 
-    if (checkCmdLineFlag(argc, (const char **)argv, "float"))
-        bTestResult = testSort<float, true>(argc, argv);
-    else
-        bTestResult = testSort<unsigned int, false>(argc, argv);
+	for (unsigned i = 0; i < 1; i++)
+	{
+		if (checkCmdLineFlag(argc, (const char **)argv, "float"))
+			bTestResult = testSort<float, true>(argc, argv);
+		else
+			bTestResult = testSort<unsigned int, false>(argc, argv);
 
-    printf(bTestResult ? "Test passed\n" : "Test failed!\n");
+		printf(bTestResult ? "Test passed\n" : "Test failed!\n");
+	}
 
 	return 0;
 }

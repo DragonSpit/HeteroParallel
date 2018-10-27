@@ -68,7 +68,7 @@ extern int clRngExample(void);
 extern int ArrayFireTest(int device);
 extern int ArrayFireIntegerExample(int device);
 extern void generateRandomArrayInChunks(int device, size_t numChunks, size_t chunkSize, unsigned long long seed = 2);
-extern int myMainSort(int argc, char **argv);
+extern int CudaThrustSort(int argc, char **argv);
 
 
 using namespace concurrency;
@@ -140,11 +140,11 @@ wmain(int argc, char **argv)
 	//mainThread();
 	//benchmarkRngLoadBalancer();		// RNG     by Multi-core CPU, Cuda GPU, and OpenCL GPU
 	benchmarkSortLoadBalancer();	// Sorting by Multi-core CPU, Cuda GPU, and OpenCL GPU
-	//myMainSort(argc, argv);
+	//CudaThrustSort(argc, argv);
 	//openClHelloWorld();
 	//secondOnenClExample();
 
-	ArrayFireTest(0);	// CUDA GPU (950M)
+	//ArrayFireTest(0);	// CUDA GPU (950M)
 	//ArrayFireTest(1);	// Intel OpenCL GPU (530)
 	//ArrayFireTest(2);	// Intel OpenCL quad-core CPU (i5-6300HQ)
 

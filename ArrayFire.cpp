@@ -60,7 +60,7 @@ void generateRandomArrayInChunks(int device, size_t numChunks, size_t chunkSize,
 //	//af_print(indexes);
 //}
 
-void sortArray(unsigned * inHostArray, size_t numItems, unsigned * outHostArray)
+void sortArray_ArrayFire(unsigned * inHostArray, size_t numItems, unsigned * outHostArray)
 {
 	af::array unsortedArrayU32(numItems, inHostArray);
 	sortedArrayU32 = af::sort(unsortedArrayU32);
@@ -97,16 +97,19 @@ int ArrayFireTest(int device)
 		timer.timeStamp();
 		std::cout << "Generate array of random U32: " << (double)numRandoms / timer.getAverageDeltaInSeconds() << " randoms/sec" << std::endl;
 
-		timer.reset();
-		timer.timeStamp();
+		for (unsigned i = 0; i < 100; i++)
+		{
+			timer.reset();
+			timer.timeStamp();
 
-		// Generate a random unsigned array
-		generateRandomFloatArray(randomArrayFloat, numRandoms, hostArrayFloat);
-		//array randomArrayU32 = randu(numRandoms, f32);	// was u32, which runs about the same speed
-		//af::sync();
+			// Generate a random unsigned array
+			generateRandomFloatArray(randomArrayFloat, numRandoms, hostArrayFloat);
+			//array randomArrayU32 = randu(numRandoms, f32);	// was u32, which runs about the same speed
+			//af::sync();
 
-		timer.timeStamp();
-		std::cout << "Generate array of random U32: " << (double)numRandoms / timer.getAverageDeltaInSeconds() << " randoms/sec" << std::endl;
+			timer.timeStamp();
+			std::cout << "Generate array of random U32: " << (double)numRandoms / timer.getAverageDeltaInSeconds() << " randoms/sec" << std::endl;
+		}
 
 		double sum = 0;
 		for (unsigned long i = 0; i < numRandoms; i++)
@@ -120,19 +123,22 @@ int ArrayFireTest(int device)
 		unsigned * inHostArray  = new unsigned [numItems];
 		unsigned * outHostArray = new unsigned [numItems];
 
-		timer.reset();
-		timer.timeStamp();
+		for (unsigned i = 0; i < 100; i++)
+		{
+			timer.reset();
+			timer.timeStamp();
 
-		sortArray(inHostArray, numItems, outHostArray);
+			sortArray_ArrayFire(inHostArray, numItems, outHostArray);
 
-		timer.timeStamp();
-		std::cout << "Sort ArrayFire: " << (double)numRandoms / timer.getAverageDeltaInSeconds() << " unsigned/sec" << std::endl;
+			timer.timeStamp();
+			std::cout << "Sort ArrayFire: " << (double)numRandoms / timer.getAverageDeltaInSeconds() << " unsigned/sec" << std::endl;
+		}
 
 		//array sortedArrayU32, indexes;
 		//sort(sortedArrayU32, indexes, unsortedRandomArrayU32);
 
 		//std::cout << "Sort array of random U32: "
-		//	<< (double)numRandoms / timeit(sortArray) << " randoms/sec" << std::endl;
+		//	<< (double)numRandoms / timeit(sortArray_ArrayFire) << " randoms/sec" << std::endl;
 
 		return 0;
 
