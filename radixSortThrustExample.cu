@@ -25,9 +25,64 @@
 #include <limits.h>
 
 template <typename T, bool floatKeys>
-bool testSort(unsigned *hostSourcePrt, unsigned numElements, int keybits, bool keysOnly, bool quiet, unsigned numIterations)
+bool testSortExample(int argc, char **argv)
 {
-    printf("Sorting %d %d-bit %s keys %s\n", numElements, keybits, floatKeys ? "float" : "unsigned int", keysOnly ? "only" : "and values");
+    int cmdVal;
+    int keybits = 32;
+
+    unsigned int numElements = 1048576;
+    bool keysOnly = checkCmdLineFlag(argc, (const char **)argv, "keysonly");
+    bool quiet    = checkCmdLineFlag(argc, (const char **)argv, "quiet");
+
+	keysOnly = true;
+
+    if (checkCmdLineFlag(argc, (const char **)argv, "n"))
+    {
+        cmdVal = getCmdLineArgumentInt(argc, (const char **)argv, "n");
+        numElements = cmdVal;
+
+        if (cmdVal < 0)
+        {
+            printf("Error: elements must be > 0, elements=%d is invalid\n", cmdVal);
+            exit(EXIT_SUCCESS);
+        }
+    }
+
+    if (checkCmdLineFlag(argc, (const char **)argv, "keybits"))
+    {
+        cmdVal = getCmdLineArgumentInt(argc, (const char **)argv, "keybits");
+        keybits = cmdVal;
+
+        if (keybits <= 0)
+        {
+            printf("Error: keybits must be > 0, keybits=%d is invalid\n", keybits);
+            exit(EXIT_SUCCESS);
+        }
+    }
+
+    unsigned int numIterations = (numElements >= 16777216) ? 10 : 100;
+
+    if (checkCmdLineFlag(argc, (const char **)argv, "iterations"))
+    {
+        cmdVal = getCmdLineArgumentInt(argc, (const char **)argv, "iterations");
+        numIterations = cmdVal;
+    }
+
+    if (checkCmdLineFlag(argc, (const char **)argv, "help"))
+    {
+        printf("Command line:\nradixSortThrust [-option]\n");
+        printf("Valid options:\n");
+        printf("-n=<N>        : number of elements to sort\n");
+        printf("-keybits=bits : keybits must be > 0\n");
+        printf("-keysonly     : only sort an array of keys (default sorts key-value pairs)\n");
+        printf("-float        : use 32-bit float keys (default is 32-bit unsigned int)\n");
+        printf("-quiet        : Output only the number of elements and the time to sort\n");
+        printf("-help         : Output a help message\n");
+        exit(EXIT_SUCCESS);
+    }
+
+    if (!quiet)
+        printf("\nSorting %d %d-bit %s keys %s\n\n", numElements, keybits, floatKeys ? "float" : "unsigned int", keysOnly ? "(only)" : "and values");
 
     int deviceID = -1;
 
@@ -74,7 +129,7 @@ bool testSort(unsigned *hostSourcePrt, unsigned numElements, int keybits, bool k
         thrust::sequence(h_values.begin(), h_values.end());
 
     // Copy data onto the GPU
-    thrust::device_vector<T> d_keys(numElements);
+    thrust::device_vector<T> d_keys;
     thrust::device_vector<unsigned int> d_values;
 
     // run multiple iterations to compute an average sort time
@@ -89,9 +144,7 @@ bool testSort(unsigned *hostSourcePrt, unsigned numElements, int keybits, bool k
 		checkCudaErrors(cudaEventRecord(start_event, 0));
 
 		// reset data before sort
-        //d_keys = h_keys;			// copy from Host memory to Device memory
-		//thrust::copy(h_keys.begin(), h_keys.end(), d_keys.begin());					// another way to copy from Host memory to Device memory
-		thrust::copy(hostSourcePrt, hostSourcePrt + numElements, d_keys.begin());		// another way to copy from Host memory to Device memory
+        d_keys = h_keys;
 
         if (!keysOnly)
             d_values = h_values;
@@ -138,19 +191,21 @@ bool testSort(unsigned *hostSourcePrt, unsigned numElements, int keybits, bool k
 	return true;
 }
 
-int CudaThrustSort(unsigned *hostSourcePrt, size_t length)
+int CudaThrustSortExample(int argc, char **argv)
 {
     // Start logs
-    //printf("%d %s Starting...\n\n", argc, argv[0]);
+    printf("%s Starting...\n\n", argv[0]);
 
-	findCudaDevice(0, NULL);
+    findCudaDevice(argc, (const char **)argv);
 
     bool bTestResult = false;
 
 	for (unsigned i = 0; i < 11; i++)
 	{
-		//bTestResult = testSort<float, true>(argc, argv);
-		bTestResult = testSort<unsigned int, false>(hostSourcePrt, length, 32, true, true, 1);
+		if (checkCmdLineFlag(argc, (const char **)argv, "float"))
+			bTestResult = testSortExample<float, true>(argc, argv);
+		else
+			bTestResult = testSortExample<unsigned int, false>(argc, argv);
 
 		printf(bTestResult ? "Test passed\n" : "Test failed!\n");
 	}

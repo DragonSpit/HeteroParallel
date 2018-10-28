@@ -69,6 +69,8 @@ extern int ArrayFireTest(int device);
 extern int ArrayFireIntegerExample(int device);
 extern void generateRandomArrayInChunks(int device, size_t numChunks, size_t chunkSize, unsigned long long seed = 2);
 extern int CudaThrustSort(int argc, char **argv);
+extern int CudaThrustSort(unsigned *hostSourcePrt, size_t length);
+
 
 
 using namespace concurrency;
@@ -139,7 +141,10 @@ wmain(int argc, char **argv)
 {
 	//mainThread();
 	//benchmarkRngLoadBalancer();		// RNG     by Multi-core CPU, Cuda GPU, and OpenCL GPU
-	benchmarkSortLoadBalancer();	// Sorting by Multi-core CPU, Cuda GPU, and OpenCL GPU
+	//benchmarkSortLoadBalancer();	// Sorting by Multi-core CPU, Cuda GPU, and OpenCL GPU
+	unsigned * thrustTestBuffer = new unsigned[1024*1024];
+	CudaThrustSort(thrustTestBuffer, 1024*1024);
+	delete[] thrustTestBuffer;
 	//CudaThrustSort(argc, argv);
 	//openClHelloWorld();
 	//secondOnenClExample();
