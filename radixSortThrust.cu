@@ -24,29 +24,48 @@
 #include <time.h>
 #include <limits.h>
 
+template <typename T>
+void CudaThrustHostToHostSort(T *hostSourcePrt, T *hostResultPrt, size_t numElements, thrust::device_vector<T>& d_keys)
+{
+	thrust::copy(hostSourcePrt, hostSourcePrt + numElements, d_keys.begin());		// copy from Host memory to Device memory
+
+	thrust::sort(d_keys.begin(), d_keys.end());
+
+	//thrust::copy(d_keys.begin(), d_keys.end(), h_keysSorted.begin());
+	thrust::copy(d_keys.begin(), d_keys.end(), hostResultPrt);		// copy from Device memory to Host memory
+
+	getLastCudaError("copying results to host memory");
+}
+
+template <typename T>
+bool CudaThrustSetup(size_t numElements)
+{
+	findCudaDevice(0, NULL);
+
+	int deviceID = -1;
+
+	if (cudaSuccess == cudaGetDevice(&deviceID))
+	{
+		cudaDeviceProp devprop;
+		cudaGetDeviceProperties(&devprop, deviceID);
+		unsigned int totalMem = 2 * numElements * sizeof(T);
+
+		if (devprop.totalGlobalMem < totalMem)
+		{
+			printf("Error: insufficient amount of memory to sort %d elements.\n", numElements);
+			printf("%d bytes needed, %d bytes available\n", (int)totalMem, (int)devprop.totalGlobalMem);
+			return false;
+		}
+	}
+	return true;
+}
+
 template <typename T, bool floatKeys>
 bool testSort(T *hostSourcePrt, T *hostResultPrt, size_t numElements, int keybits, bool quiet, unsigned numIterations)
 {
     printf("Sorting %ul %d-bit %s keys only\n", numElements, keybits, floatKeys ? "float" : "unsigned int");
 
-    int deviceID = -1;
-
-    if (cudaSuccess == cudaGetDevice(&deviceID))
-    {
-        cudaDeviceProp devprop;
-        cudaGetDeviceProperties(&devprop, deviceID);
-        unsigned int totalMem = 2 * numElements * sizeof(T);
-
-        if (devprop.totalGlobalMem < totalMem)
-        {
-            printf("Error: insufficient amount of memory to sort %d elements.\n", numElements);
-            printf("%d bytes needed, %d bytes available\n", (int) totalMem, (int) devprop.totalGlobalMem);
-            exit(EXIT_SUCCESS);
-        }
-    }
-
-    // Copy data onto the GPU
-    thrust::device_vector<T> d_keys(numElements);
+    thrust::device_vector<T> d_keys(numElements);	// Device memory used for sorting in-place
 
     // run multiple iterations to compute an average sort time
     cudaEvent_t start_event, stop_event;
@@ -59,14 +78,7 @@ bool testSort(T *hostSourcePrt, T *hostResultPrt, size_t numElements, int keybit
     {
 		checkCudaErrors(cudaEventRecord(start_event, 0));
 
-		thrust::copy(hostSourcePrt, hostSourcePrt + numElements, d_keys.begin());		// copy from Host memory to Device memory
-
-        thrust::sort(d_keys.begin(), d_keys.end());
-
-		//thrust::copy(d_keys.begin(), d_keys.end(), h_keysSorted.begin());
-		thrust::copy(d_keys.begin(), d_keys.end(), hostResultPrt);		// copy from Device memory to Host memory
-
-		getLastCudaError("copying results to host memory");
+		CudaThrustHostToHostSort(hostSourcePrt, hostResultPrt, numElements, d_keys);
 
 		checkCudaErrors(cudaEventRecord(stop_event, 0));
         checkCudaErrors(cudaEventSynchronize(stop_event));
@@ -102,14 +114,11 @@ bool IsSorted(unsigned *hostBufferPtr, size_t length)
 
 int CudaThrustSort(unsigned *hostSourcePrt, unsigned *hostResultPrt, size_t length)
 {
-    // Start logs
-    //printf("%d %s Starting...\n\n", argc, argv[0]);
-
-	findCudaDevice(0, NULL);
+	CudaThrustSetup<unsigned>(length);
 
     bool bTestResult = false;
 
-	for (unsigned i = 0; i < 11; i++)
+	for (unsigned i = 0; i < 5; i++)
 	{
 		//bTestResult = testSort<float, true>(argc, argv);
 		bTestResult = testSort<unsigned, false>(hostSourcePrt, hostResultPrt, length, 32, true, 1);
