@@ -69,8 +69,7 @@ extern int ArrayFireTest(int device);
 extern int ArrayFireIntegerExample(int device);
 extern void generateRandomArrayInChunks(int device, size_t numChunks, size_t chunkSize, unsigned long long seed = 2);
 extern int CudaThrustSort(int argc, char **argv);
-extern int CudaThrustSort(unsigned *hostSourcePrt, size_t length);
-
+extern int CudaThrustSort(unsigned *hostSourcePrt, unsigned *hostResultPrt, size_t length);
 
 
 using namespace concurrency;
@@ -142,9 +141,21 @@ wmain(int argc, char **argv)
 	//mainThread();
 	//benchmarkRngLoadBalancer();		// RNG     by Multi-core CPU, Cuda GPU, and OpenCL GPU
 	//benchmarkSortLoadBalancer();	// Sorting by Multi-core CPU, Cuda GPU, and OpenCL GPU
-	unsigned * thrustTestBuffer = new unsigned[1024*1024];
-	CudaThrustSort(thrustTestBuffer, 1024*1024);
-	delete[] thrustTestBuffer;
+	size_t length = 1024 * 1024;
+	unsigned * thrustTestSourceBuffer = new unsigned[length];
+	unsigned * thrustTestResultBuffer = new unsigned[length];
+
+	std::random_device rd;
+	std::mt19937 mt(rd());
+	std::uniform_real_distribution<double> dist(0.0, 1.0);
+
+	for (size_t i = 0; i < length; i++)
+		thrustTestSourceBuffer[i] = dist(mt) * UINT_MAX;
+
+	CudaThrustSort(thrustTestSourceBuffer, thrustTestResultBuffer, length);
+
+	delete[] thrustTestSourceBuffer;
+	delete[] thrustTestResultBuffer;
 	//CudaThrustSort(argc, argv);
 	//openClHelloWorld();
 	//secondOnenClExample();

@@ -25,9 +25,9 @@
 #include <limits.h>
 
 template <typename T, bool floatKeys>
-bool testSort(unsigned *hostSourcePrt, unsigned numElements, int keybits, bool keysOnly, bool quiet, unsigned numIterations)
+bool testSort(T *hostSourcePrt, T *hostResultPrt, size_t numElements, int keybits, bool quiet, unsigned numIterations)
 {
-    printf("Sorting %d %d-bit %s keys %s\n", numElements, keybits, floatKeys ? "float" : "unsigned int", keysOnly ? "only" : "and values");
+    printf("Sorting %ul %d-bit %s keys only\n", numElements, keybits, floatKeys ? "float" : "unsigned int");
 
     int deviceID = -1;
 
@@ -35,7 +35,7 @@ bool testSort(unsigned *hostSourcePrt, unsigned numElements, int keybits, bool k
     {
         cudaDeviceProp devprop;
         cudaGetDeviceProperties(&devprop, deviceID);
-        unsigned int totalMem = (keysOnly ? 2 : 4) * numElements * sizeof(T);
+        unsigned int totalMem = 2 * numElements * sizeof(T);
 
         if (devprop.totalGlobalMem < totalMem)
         {
@@ -45,37 +45,8 @@ bool testSort(unsigned *hostSourcePrt, unsigned numElements, int keybits, bool k
         }
     }
 
-    thrust::host_vector<T> h_keys(numElements);
-    thrust::host_vector<T> h_keysSorted(numElements);
-    thrust::host_vector<unsigned int> h_values;
-
-    if (!keysOnly)
-        h_values = thrust::host_vector<unsigned int>(numElements);
-
-    // Fill up with some random data
-    thrust::default_random_engine rng(clock());
-
-    if (floatKeys)
-    {
-        thrust::uniform_real_distribution<float> u01(0, 1);
-
-        for (int i = 0; i < (int)numElements; i++)
-            h_keys[i] = u01(rng);
-    }
-    else
-    {
-        thrust::uniform_int_distribution<unsigned int> u(0, UINT_MAX);
-
-        for (int i = 0; i < (int)numElements; i++)
-            h_keys[i] = u(rng);
-    }
-
-    if (!keysOnly)
-        thrust::sequence(h_values.begin(), h_values.end());
-
     // Copy data onto the GPU
     thrust::device_vector<T> d_keys(numElements);
-    thrust::device_vector<unsigned int> d_values;
 
     // run multiple iterations to compute an average sort time
     cudaEvent_t start_event, stop_event;
@@ -88,38 +59,17 @@ bool testSort(unsigned *hostSourcePrt, unsigned numElements, int keybits, bool k
     {
 		checkCudaErrors(cudaEventRecord(start_event, 0));
 
-		// reset data before sort
-        //d_keys = h_keys;			// copy from Host memory to Device memory
-		//thrust::copy(h_keys.begin(), h_keys.end(), d_keys.begin());					// another way to copy from Host memory to Device memory
-		thrust::copy(hostSourcePrt, hostSourcePrt + numElements, d_keys.begin());		// another way to copy from Host memory to Device memory
+		thrust::copy(hostSourcePrt, hostSourcePrt + numElements, d_keys.begin());		// copy from Host memory to Device memory
 
-        if (!keysOnly)
-            d_values = h_values;
+        thrust::sort(d_keys.begin(), d_keys.end());
 
-        if (keysOnly)
-            thrust::sort(d_keys.begin(), d_keys.end());
-        else
-            thrust::sort_by_key(d_keys.begin(), d_keys.end(), d_values.begin());
-
-		// Get results back to host for correctness checking
-		thrust::copy(d_keys.begin(), d_keys.end(), h_keysSorted.begin());
-
-		if (!keysOnly)
-			thrust::copy(d_values.begin(), d_values.end(), h_values.begin());
+		//thrust::copy(d_keys.begin(), d_keys.end(), h_keysSorted.begin());
+		thrust::copy(d_keys.begin(), d_keys.end(), hostResultPrt);		// copy from Device memory to Host memory
 
 		getLastCudaError("copying results to host memory");
 
 		checkCudaErrors(cudaEventRecord(stop_event, 0));
         checkCudaErrors(cudaEventSynchronize(stop_event));
-
-		// Check results
-		bool bTestResult = thrust::is_sorted(h_keysSorted.begin(), h_keysSorted.end());
-
-		if (!bTestResult && !quiet)
-		{
-			printf("Error: Result array is not sorted\n");
-			return false;
-		}
 
 		float time = 0;
         checkCudaErrors(cudaEventElapsedTime(&time, start_event, stop_event));
@@ -138,7 +88,19 @@ bool testSort(unsigned *hostSourcePrt, unsigned numElements, int keybits, bool k
 	return true;
 }
 
-int CudaThrustSort(unsigned *hostSourcePrt, size_t length)
+bool IsSorted(unsigned *hostBufferPtr, size_t length)
+{
+	for (size_t i = 0; i < length - 1; i++)
+	{
+		//if (i < 20)
+		//	printf("%u\n", hostBufferPtr[i]);
+		if (hostBufferPtr[i] > hostBufferPtr[i+1])
+			return false;
+	}
+	return true;
+}
+
+int CudaThrustSort(unsigned *hostSourcePrt, unsigned *hostResultPrt, size_t length)
 {
     // Start logs
     //printf("%d %s Starting...\n\n", argc, argv[0]);
@@ -150,11 +112,12 @@ int CudaThrustSort(unsigned *hostSourcePrt, size_t length)
 	for (unsigned i = 0; i < 11; i++)
 	{
 		//bTestResult = testSort<float, true>(argc, argv);
-		bTestResult = testSort<unsigned int, false>(hostSourcePrt, length, 32, true, true, 1);
+		bTestResult = testSort<unsigned, false>(hostSourcePrt, hostResultPrt, length, 32, true, 1);
+
+		bTestResult = IsSorted(hostResultPrt, length);
 
 		printf(bTestResult ? "Test passed\n" : "Test failed!\n");
 	}
 
 	return 0;
 }
-
