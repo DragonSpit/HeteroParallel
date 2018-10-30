@@ -76,7 +76,7 @@ int CudaGpuGenerateSortWork(SortToDo & sortSpec, const size_t & NumOfItemsInWork
 		(sortSpec.resultDestination == ResultInCpuMemory     || sortSpec.resultDestination == ResultInEachDevicesMemory ||	// TODO: Where the result is going should not even matter, as long as CudaGpu is allowed to do work, it should do work
 		 sortSpec.resultDestination == ResultInCudaGpuMemory || sortSpec.resultDestination == ResultInOpenclGpuMemory)) {
 		if ((resultArrayIndex_GPU + NumOfItemsInWorkQuanta) < sortSpec.CudaGPU.maxElements) {
-			printf("CudaGPU work item being generated\n");
+			//printf("CudaGPU work item being generated\n");
 			workCudaGPU.TypeOfWork = Sort;
 			workCudaGPU.ForWhichWorker  = ComputeEngine::CUDA_GPU;
 			workCudaGPU.AmountOfWork    = NumOfItemsInWorkQuanta;
@@ -97,7 +97,7 @@ int CudaGpuGenerateSortWork(SortToDo & sortSpec, const size_t & NumOfItemsInWork
 				// don't advance CPU array index
 			}
 			//printf("Cuda GPU work item: amountOfWork = %zd at GPU memory address %p\n", workCudaGPU.AmountOfWork, workCudaGPU.DeviceResultPtr);
-			printf("Event set for work item for CUDA GPU\n");
+			//printf("Event set for work item for CUDA GPU\n");
 			if (!SetEvent(ghEventHaveWorkItemForCudaGpu))		// signal that CudaGpu has a work item to work on
 			{
 				printf("SetEvent ghEventHaveWorkItemForCudaGpu failed (%d)\n", GetLastError());
@@ -118,7 +118,7 @@ int OpenclGpuGenerateSortWork(SortToDo & sortSpec, const size_t & NumOfItemsInWo
 		(sortSpec.resultDestination == ResultInCpuMemory     || sortSpec.resultDestination == ResultInEachDevicesMemory ||	// TODO: Where the result is going should not even matter, as long as CudaGpu is allowed to do work, it should do work
 		 sortSpec.resultDestination == ResultInCudaGpuMemory || sortSpec.resultDestination == ResultInOpenclGpuMemory)) {
 		if ((resultArrayIndex_GPU + NumOfItemsInWorkQuanta) < sortSpec.OpenclGPU.maxElements) {
-			printf("OpenclGPU work item being generated\n");
+			//printf("OpenclGPU work item being generated\n");
 			workOpenclGPU.TypeOfWork = Sort;
 			workOpenclGPU.ForWhichWorker = ComputeEngine::OPENCL_GPU;
 			workOpenclGPU.AmountOfWork  = NumOfItemsInWorkQuanta;
@@ -139,7 +139,7 @@ int OpenclGpuGenerateSortWork(SortToDo & sortSpec, const size_t & NumOfItemsInWo
 				// don't advance CPU array index
 			}
 			//printf("OpenCL GPU work item: amountOfWork = %zd at GPU memory address %p\n", workOpenclGPU.AmountOfWork, workOpenclGPU.DeviceResultPtr);
-			printf("Event set for work item for OpenCL GPU\n");
+			//printf("Event set for work item for OpenCL GPU\n");
 			if (!SetEvent(ghEventHaveWorkItemForOpenclGpu))		// signal that OpenclGpu has a work item to work on
 			{
 				printf("SetEvent ghEventHaveWorkItemForOpenclGpu failed (%d)\n", GetLastError());
@@ -310,6 +310,13 @@ int runLoadBalancerSortThread(SortToDo& sortSpec, ofstream& benchmarkFile, unsig
 			benchmarkFile << NumOfWorkItems * NumOfItemsInWorkQuanta << "\t" << (size_t)((double)NumOfWorkItems * NumOfItemsInWorkQuanta / timer.getAverageDeltaInSeconds()) << endl;
 		}
 		else if (sortSpec.resultDestination == ResultInCpuMemory && sortSpec.CudaGPU.allowedToWork && sortSpec.OpenclGPU.allowedToWork)
+		{
+			printf("Just sorting of randoms runs at %zd unsigned/second\n", (size_t)((double)NumOfWorkItems * NumOfItemsInWorkQuanta / timer.getAverageDeltaInSeconds()));
+			printf("CPU sorted %0.0f%% randoms, CUDA GPU sorted %0.0f%% randoms, OpenCL GPU sorted %0.0f%% randoms\n",
+				(double)numCpuWorkItemsDone / NumOfWorkItems * 100, (double)numCudaGpuWorkItemsDone / NumOfWorkItems * 100, (double)numOpenclGpuWorkItemsDone / NumOfWorkItems * 100);
+			benchmarkFile << NumOfWorkItems * NumOfItemsInWorkQuanta << "\t" << (size_t)((double)NumOfWorkItems * NumOfItemsInWorkQuanta / timer.getAverageDeltaInSeconds()) << endl;
+		}
+		else if (sortSpec.resultDestination == ResultInCpuMemory && sortSpec.CudaGPU.allowedToWork)
 		{
 			printf("Just sorting of randoms runs at %zd unsigned/second\n", (size_t)((double)NumOfWorkItems * NumOfItemsInWorkQuanta / timer.getAverageDeltaInSeconds()));
 			printf("CPU sorted %0.0f%% randoms, CUDA GPU sorted %0.0f%% randoms, OpenCL GPU sorted %0.0f%% randoms\n",

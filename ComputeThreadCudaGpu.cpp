@@ -18,6 +18,7 @@ using namespace std;
 extern void GenerateRandFloatCuda(float *devMemPtr, float *sysMemPtr, curandGenerator_t& prngGPU, size_t numRandoms, bool verify, curandGenerator_t& prngCPU);
 extern void copyCudaToSystemMemory(void *systemMemPtr, void *cudaMemPtr, size_t numBytes);
 extern void CudaThrustHostToHostSort(unsigned *hostSourcePrt, unsigned *hostResultPrt, size_t numElements);
+extern void CudaThrustHostToHostSort_2(unsigned *hostSourcePrt, unsigned *hostResultPrt, size_t numElements);
 extern HANDLE ghEventsComputeDone[NumComputeDoneEvents];	// 0 - MultiCoreCpu, 1 - CudaGpu, 2 - OpenClGpu, 3 - OpenClFpga
 extern bool gRunComputeWorkers;
 
@@ -43,7 +44,7 @@ DWORD WINAPI ThreadCudaGpuCompute(LPVOID lpParam)
 		{
 			// Event object was signaled
 		case WAIT_OBJECT_0:
-			printf("ThreadCudaGpuCompute %d received work item to do\n", GetCurrentThreadId());
+			//printf("ThreadCudaGpuCompute %d received work item to do\n", GetCurrentThreadId());
 			break;
 			// An error occurred
 		default:
@@ -58,8 +59,8 @@ DWORD WINAPI ThreadCudaGpuCompute(LPVOID lpParam)
 			GenerateRandFloatCuda((float *)workCudaGPU.DeviceResultPtr, (float *)workCudaGPU.HostResultPtr, gCudaRngSupport->prngGPU, workCudaGPU.AmountOfWork, false, gCudaRngSupport->prngCPU);
 			break;
 		case Sort:
-			printf("Cuda GPU compute thread: performing Sort type of work\n");
-			CudaThrustHostToHostSort((unsigned *)workCudaGPU.HostSourcePtr, (unsigned *)workCudaGPU.HostResultPtr, workCudaGPU.AmountOfWork);
+			//printf("Cuda GPU compute thread: performing Sort type of work\n");
+			CudaThrustHostToHostSort_2((unsigned *)workCudaGPU.HostSourcePtr, (unsigned *)workCudaGPU.HostResultPtr, workCudaGPU.AmountOfWork);
 			break;
 		}
 

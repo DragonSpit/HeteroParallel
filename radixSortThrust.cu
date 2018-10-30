@@ -69,10 +69,10 @@ bool CudaThrustSetup(size_t numElements)
 	return true;
 }
 
-template <typename T, bool floatKeys>
-bool testSort(T *hostSourcePrt, T *hostResultPrt, size_t numElements, int keybits, bool quiet, unsigned numIterations)
+template <typename T>
+void testSort(T *hostSourcePrt, T *hostResultPrt, size_t numElements)
 {
-    printf("Sorting %ul %d-bit %s keys only\n", numElements, keybits, floatKeys ? "float" : "unsigned int");
+    //printf("Sorting %ul %d-bit %s keys only\n", numElements, keybits, floatKeys ? "float" : "unsigned int");
 
     // run multiple iterations to compute an average sort time
     cudaEvent_t start_event, stop_event;
@@ -81,30 +81,30 @@ bool testSort(T *hostSourcePrt, T *hostResultPrt, size_t numElements, int keybit
 
     float totalTime = 0;
 
-    for (unsigned int i = 0; i < numIterations; i++)
-    {
-		checkCudaErrors(cudaEventRecord(start_event, 0));
+	checkCudaErrors(cudaEventRecord(start_event, 0));
 
-		CudaThrustHostToHostSort(hostSourcePrt, hostResultPrt, numElements);
+	CudaThrustHostToHostSort<T>(hostSourcePrt, hostResultPrt, numElements);
 
-		checkCudaErrors(cudaEventRecord(stop_event, 0));
-        checkCudaErrors(cudaEventSynchronize(stop_event));
+	checkCudaErrors(cudaEventRecord(stop_event, 0));
+    checkCudaErrors(cudaEventSynchronize(stop_event));
 
-		float time = 0;
-        checkCudaErrors(cudaEventElapsedTime(&time, start_event, stop_event));
-        totalTime += time;
+	float time = 0;
+    checkCudaErrors(cudaEventElapsedTime(&time, start_event, stop_event));
+    totalTime += time;
 
-		totalTime /= 1.0e3f;
-		printf("radixSortThrust, Throughput = %.4f MElements/s, Time = %.5f s, Size = %u elements\n",
-			1.0e-6f * numElements / totalTime, totalTime, numElements);
-	}
+	//totalTime /= 1.0e3f;
+	//printf("radixSortThrust, Throughput = %.4f MElements/s, Time = %.5f s, Size = %u elements\n",
+	//	1.0e-6f * numElements / totalTime, totalTime, numElements);
 
     getLastCudaError("after radixsort");
 
 	checkCudaErrors(cudaEventDestroy(start_event));
 	checkCudaErrors(cudaEventDestroy(stop_event));
+}
 
-	return true;
+void CudaThrustHostToHostSort_2(unsigned *hostSourcePrt, unsigned *hostResultPrt, size_t numElements)
+{
+	testSort<unsigned>(hostSourcePrt, hostResultPrt, numElements);
 }
 
 bool IsSorted(unsigned *hostBufferPtr, size_t length)
@@ -125,10 +125,10 @@ int CudaThrustSort(unsigned *hostSourcePrt, unsigned *hostResultPrt, size_t leng
 
     bool bTestResult = false;
 
-	for (unsigned i = 0; i < 5; i++)
+	for (unsigned i = 0; i < 20; i++)
 	{
 		//bTestResult = testSort<float, true>(argc, argv);
-		bTestResult = testSort<unsigned, false>(hostSourcePrt, hostResultPrt, length, 32, true, 1);
+		testSort<unsigned>(hostSourcePrt, hostResultPrt, length);
 
 		bTestResult = IsSorted(hostResultPrt, length);
 
