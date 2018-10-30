@@ -139,8 +139,10 @@ int MemoryAllocatorCudaGpu_Sort(SortToDo& sortSpec)
 	if (!sortSpec.CudaGPU.allowedToWork)
 		preallocateGPUmemorySize = 0;
 	else {
-		if (sortSpec.resultDestination == ResultInCpuMemory)
-			preallocateGPUmemorySize = sortSpec.CudaGPU.workQuanta * sortSpec.CudaGPU.sizeOfItem;	// when GPU is a helper, only pre-allocate workQuanta size in GPU memory and use the same memory buffer for each work item
+		if (sortSpec.resultDestination == ResultInCpuMemory) {
+			preallocateGPUmemorySize = 0;	// TODO: To start with we allocate CUDA device memory inside the sort method, but that's slightly slower and will need to be improved by pre-allocating smartly
+			//preallocateGPUmemorySize = sortSpec.CudaGPU.workQuanta * sortSpec.CudaGPU.sizeOfItem;	// when GPU is a helper, only pre-allocate workQuanta size in GPU memory and use the same memory buffer for each work item
+		}
 		else {
 			printf("Error: Unsupported configuration sort Cuda GPU\n");
 			exit(-1);
@@ -277,14 +279,14 @@ int benchmarkSortLoadBalancer()
 	// TODO: That's all that should be specified - i.e. max percentage of device memory to be used
 	sortSpec.CudaGPU.sizeOfItem = sizeof(unsigned);
 	sortSpec.CudaGPU.maxElements = (size_t)(sortSpec.CudaGPU.memoryCapacity * 0.75 / 2) / sortSpec.CudaGPU.sizeOfItem;	// use up to 75% of GPU memory for randoms
-	sortSpec.CudaGPU.allowedToWork = false;
+	sortSpec.CudaGPU.allowedToWork = true;
 
 	sortSpec.OpenclGPU.workQuanta = 0;		// indicates user is ok with automatic determination 
 	sortSpec.OpenclGPU.memoryCapacity = (size_t)6 * 1024 * 1024 * 1024;
 	// TODO: That's all that should be specified - i.e. max percentage of device memory to be used
 	sortSpec.OpenclGPU.sizeOfItem = sizeof(unsigned);
 	sortSpec.OpenclGPU.maxElements = (size_t)(sortSpec.OpenclGPU.memoryCapacity * 0.75 / 2) / sortSpec.OpenclGPU.sizeOfItem;	// use up to 75% of GPU memory for randoms
-	sortSpec.OpenclGPU.allowedToWork = true;
+	sortSpec.OpenclGPU.allowedToWork = false;
 
 	// TODO: Source buffers will most likely come from external sources, such as previous computational stage providing input to this sorting stage
 	sortSpec.Unsorted.CPU.Buffer = (char *) new unsigned long[sortSpec.totalItemsToSort];
@@ -295,6 +297,7 @@ int benchmarkSortLoadBalancer()
 	sortSpec.Unsorted.CudaGPU.Buffer = NULL;		// NULL implies the generator is to allocate memory. non-NULL implies reuse the buffer provided
 	sortSpec.Unsorted.CudaGPU.Length = 0;
 	sortSpec.Unsorted.allocatedByMeCudaGpuBuffer = false;
+
 	sortSpec.Unsorted.OpenclGPU.Buffer = NULL;	// NULL implies the generator is to allocate memory. non-NULL implies reuse the buffer provided
 	sortSpec.Unsorted.OpenclGPU.Length = 0;
 	sortSpec.Unsorted.allocatedByMeOpenclGpuBuffer = false;
@@ -302,12 +305,15 @@ int benchmarkSortLoadBalancer()
 	sortSpec.Sorted.CPU.Buffer = NULL;			// NULL implies the generator is to allocate memory. non-NULL implies reuse the buffer provided
 	sortSpec.Sorted.CPU.Length = 0;
 	sortSpec.Sorted.allocatedByMeCpuBuffer = false;
+
 	sortSpec.Sorted.CudaGPU.Buffer = NULL;		// NULL implies the generator is to allocate memory. non-NULL implies reuse the buffer provided
 	sortSpec.Sorted.CudaGPU.Length = 0;
 	sortSpec.Sorted.allocatedByMeCudaGpuBuffer = false;
+
 	sortSpec.Sorted.OpenclGPU.Buffer = NULL;	// NULL implies the generator is to allocate memory. non-NULL implies reuse the buffer provided
 	sortSpec.Sorted.OpenclGPU.Length = 0;
 	sortSpec.Sorted.allocatedByMeOpenclGpuBuffer = false;
+
 	printf("sortSpec set\n");
 
 	if (ValidatorSort(sortSpec) != 0)

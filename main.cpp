@@ -140,8 +140,9 @@ wmain(int argc, char **argv)
 {
 	//mainThread();
 	//benchmarkRngLoadBalancer();		// RNG     by Multi-core CPU, Cuda GPU, and OpenCL GPU
-	//benchmarkSortLoadBalancer();	// Sorting by Multi-core CPU, Cuda GPU, and OpenCL GPU
-	size_t length = 1024 * 1024;
+	benchmarkSortLoadBalancer();	// Sorting by Multi-core CPU, Cuda GPU, and OpenCL GPU
+#if 0
+	size_t length = 20 * 1024 * 1024;
 	unsigned * thrustTestSourceBuffer = new unsigned[length];
 	unsigned * thrustTestResultBuffer = new unsigned[length];
 
@@ -156,6 +157,7 @@ wmain(int argc, char **argv)
 
 	delete[] thrustTestSourceBuffer;
 	delete[] thrustTestResultBuffer;
+#endif
 	//CudaThrustSort(argc, argv);
 	//openClHelloWorld();
 	//secondOnenClExample();

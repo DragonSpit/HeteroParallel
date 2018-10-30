@@ -25,8 +25,12 @@
 #include <limits.h>
 
 template <typename T>
-void CudaThrustHostToHostSort(T *hostSourcePrt, T *hostResultPrt, size_t numElements, thrust::device_vector<T>& d_keys)
+static void CudaThrustHostToHostSort(T *hostSourcePrt, T *hostResultPrt, size_t numElements)
 {
+	// TODO: Pre-allocate this array to speed up sorting on CUDA GPU. However, how do you know how big to make it? Probably, need to make it as big as possible and use only a portion of it.
+	// TODO: This will work once we can handle sorting in chunks and merging the results
+	thrust::device_vector<T> d_keys(numElements);	// Device memory used for sorting in-place
+
 	thrust::copy(hostSourcePrt, hostSourcePrt + numElements, d_keys.begin());		// copy from Host memory to Device memory
 
 	thrust::sort(d_keys.begin(), d_keys.end());
@@ -35,6 +39,11 @@ void CudaThrustHostToHostSort(T *hostSourcePrt, T *hostResultPrt, size_t numElem
 	thrust::copy(d_keys.begin(), d_keys.end(), hostResultPrt);		// copy from Device memory to Host memory
 
 	getLastCudaError("copying results to host memory");
+}
+
+void CudaThrustHostToHostSort(unsigned *hostSourcePrt, unsigned *hostResultPrt, size_t numElements)
+{
+	CudaThrustHostToHostSort<unsigned>(hostSourcePrt, hostResultPrt, numElements);
 }
 
 template <typename T>
@@ -65,8 +74,6 @@ bool testSort(T *hostSourcePrt, T *hostResultPrt, size_t numElements, int keybit
 {
     printf("Sorting %ul %d-bit %s keys only\n", numElements, keybits, floatKeys ? "float" : "unsigned int");
 
-    thrust::device_vector<T> d_keys(numElements);	// Device memory used for sorting in-place
-
     // run multiple iterations to compute an average sort time
     cudaEvent_t start_event, stop_event;
     checkCudaErrors(cudaEventCreate(&start_event));
@@ -78,7 +85,7 @@ bool testSort(T *hostSourcePrt, T *hostResultPrt, size_t numElements, int keybit
     {
 		checkCudaErrors(cudaEventRecord(start_event, 0));
 
-		CudaThrustHostToHostSort(hostSourcePrt, hostResultPrt, numElements, d_keys);
+		CudaThrustHostToHostSort(hostSourcePrt, hostResultPrt, numElements);
 
 		checkCudaErrors(cudaEventRecord(stop_event, 0));
         checkCudaErrors(cudaEventSynchronize(stop_event));
@@ -86,11 +93,11 @@ bool testSort(T *hostSourcePrt, T *hostResultPrt, size_t numElements, int keybit
 		float time = 0;
         checkCudaErrors(cudaEventElapsedTime(&time, start_event, stop_event));
         totalTime += time;
-    }
 
-    totalTime /= (1.0e3f * numIterations);
-    printf("radixSortThrust, Throughput = %.4f MElements/s, Time = %.5f s, Size = %u elements\n",
-           1.0e-6f * numElements / totalTime, totalTime, numElements);
+		totalTime /= 1.0e3f;
+		printf("radixSortThrust, Throughput = %.4f MElements/s, Time = %.5f s, Size = %u elements\n",
+			1.0e-6f * numElements / totalTime, totalTime, numElements);
+	}
 
     getLastCudaError("after radixsort");
 

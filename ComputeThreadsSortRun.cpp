@@ -96,7 +96,7 @@ int CudaGpuGenerateSortWork(SortToDo & sortSpec, const size_t & NumOfItemsInWork
 				resultArrayIndex_GPU += NumOfItemsInWorkQuanta;
 				// don't advance CPU array index
 			}
-			printf("Cuda GPU work item: amountOfWork = %zd at GPU memory address %p\n", workCudaGPU.AmountOfWork, workCudaGPU.DeviceResultPtr);
+			//printf("Cuda GPU work item: amountOfWork = %zd at GPU memory address %p\n", workCudaGPU.AmountOfWork, workCudaGPU.DeviceResultPtr);
 			printf("Event set for work item for CUDA GPU\n");
 			if (!SetEvent(ghEventHaveWorkItemForCudaGpu))		// signal that CudaGpu has a work item to work on
 			{
@@ -118,7 +118,7 @@ int OpenclGpuGenerateSortWork(SortToDo & sortSpec, const size_t & NumOfItemsInWo
 		(sortSpec.resultDestination == ResultInCpuMemory     || sortSpec.resultDestination == ResultInEachDevicesMemory ||	// TODO: Where the result is going should not even matter, as long as CudaGpu is allowed to do work, it should do work
 		 sortSpec.resultDestination == ResultInCudaGpuMemory || sortSpec.resultDestination == ResultInOpenclGpuMemory)) {
 		if ((resultArrayIndex_GPU + NumOfItemsInWorkQuanta) < sortSpec.OpenclGPU.maxElements) {
-			//printf("OpenclGPU work item being generated\n");
+			printf("OpenclGPU work item being generated\n");
 			workOpenclGPU.TypeOfWork = Sort;
 			workOpenclGPU.ForWhichWorker = ComputeEngine::OPENCL_GPU;
 			workOpenclGPU.AmountOfWork  = NumOfItemsInWorkQuanta;
@@ -139,7 +139,7 @@ int OpenclGpuGenerateSortWork(SortToDo & sortSpec, const size_t & NumOfItemsInWo
 				// don't advance CPU array index
 			}
 			//printf("OpenCL GPU work item: amountOfWork = %zd at GPU memory address %p\n", workOpenclGPU.AmountOfWork, workOpenclGPU.DeviceResultPtr);
-			//printf("Event set for work item for OpenCL GPU\n");
+			printf("Event set for work item for OpenCL GPU\n");
 			if (!SetEvent(ghEventHaveWorkItemForOpenclGpu))		// signal that OpenclGpu has a work item to work on
 			{
 				printf("SetEvent ghEventHaveWorkItemForOpenclGpu failed (%d)\n", GetLastError());
@@ -181,8 +181,8 @@ int runLoadBalancerSortThread(SortToDo& sortSpec, ofstream& benchmarkFile, unsig
 		NumOfWorkItems = NumOfWorkItems = NumOfItemsToSort / NumOfItemsInWorkQuanta;
 
 	//TODO: need source device memory!
-	unsigned long *sourceUnsortedArray_CudaGPU = (unsigned long *)(gCudaSourceMemory != NULL ? gCudaSourceMemory->m_gpu_memory : NULL);
-	unsigned long *resultSortedArray_CudaGPU   = (unsigned long *)(gCudaSourceMemory != NULL ? gCudaResultMemory->m_gpu_memory : NULL);
+	unsigned long *sourceUnsortedArray_CudaGPU = (unsigned long *)sortSpec.Unsorted.CPU.Buffer;
+	unsigned long *resultSortedArray_CudaGPU   = (unsigned long *)sortSpec.Sorted.CPU.Buffer;
 	// TODO: OpenCL memory for now needs to be host memory, as we are getting sorting to work from host to host memory first. Plus, ArrayFire has it's own array data type in GPU memory instead of using host mapped memory
 	unsigned long *sourceUnsortedArray_OpenClGPU = NULL;
 	unsigned long *resultSortedArray_OpenClGPU   = NULL;
@@ -255,7 +255,9 @@ int runLoadBalancerSortThread(SortToDo& sortSpec, ofstream& benchmarkFile, unsig
 				break;
 				// ghEventsComputeDone[1] (CUDA GPU) was signaled => done with its work item
 			case WAIT_OBJECT_0 + CUDA_GPU:
-				printf("ghEventsComputeDone CUDA GPU event was signaled.\n");
+				//printf("ghEventsComputeDone CUDA GPU event was signaled.\n");
+				//if (!IsCompletedWorkItemSorted(resultSortedArray_CPU, resultArrayIndex_CPU - NumOfItemsInWorkQuanta, NumOfItemsInWorkQuanta))
+				//	exit(-1);
 				if (inputWorkIndex < NumOfWorkItems) {
 					int returnValue = CudaGpuGenerateSortWork(sortSpec, NumOfItemsInWorkQuanta,
 															  sourceUnsortedArray_CudaGPU, sourceArrayIndex_CudaGPU, sourceUnsortedArray_CPU, sourceArrayIndex_CPU,
